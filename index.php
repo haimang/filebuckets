@@ -47,7 +47,7 @@ $exclude_items = array();
 // Google => View documents using Google Docs Viewer
 // Microsoft => View documents using Microsoft Web Apps Viewer
 // false => disable online doc viewer
-$online_viewer = 'Microsoft';
+$online_viewer = 'Google';
 
 // Sticky Nav bar
 // true => enable sticky header
@@ -962,7 +962,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         // ZIP info
         if($is_onlineViewer) {
             //现在本地文件线上不能访问 测试https://console.unifyestate.com/apartment-v2.7.xlsx
-            //$file_url='https://console.unifyestate.com/apartment-v2.7.xlsx';
+            //$file_url='https://filebuckets.com/Proposal%20-%20VIC%20-%2017%20Wordsworth%20Ave.pdf';
             if($online_viewer == 'google') {
                 $html.= '<iframe src="https://docs.google.com/viewer?embedded=true&hl=en&url=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
             } else if($online_viewer == 'microsoft') {
