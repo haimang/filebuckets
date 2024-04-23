@@ -157,7 +157,7 @@ defined('FM_ROOT_URL') || define('FM_ROOT_URL', ($is_https ? 'https' : 'http') .
 defined('FM_SELF_URL') || define('FM_SELF_URL', ($is_https ? 'https' : 'http') . '://' . $http_host . $_SERVER['PHP_SELF']);
 
 $external = array(
-    'logo' => 'data/dist/image/logo.svg',
+    'logo' => 'data/dist/image/logo.png',
     'css-tabler' => '<link href="data/dist/css/tabler.min.css" rel="stylesheet"/>',
     'css-tabler-flags' => '<link href="data/dist/css/tabler-flags.min.css" rel="stylesheet"/>',
     'css-tabler-payments' => '<link href="data/dist/css/tabler-payments.min.css" rel="stylesheet"/>',
@@ -427,6 +427,32 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             echo json_encode($response);
                 exit();
         }
+    }
+
+    //密码修改
+    if(isset($_POST['password'], $_POST['token']) && !FM_READONLY){
+        $stmt_s = $pdo->prepare("SELECT * FROM users WHERE hash = ?");
+        $stmt_s->execute([$_SESSION[FM_SESSION_ID]['hash']]);
+        $userinfo = $stmt_s->fetch(PDO::FETCH_ASSOC);
+        if(!$userinfo){
+            $response = array(
+                'status' => 'error',
+                'info' =>lng('not found!')
+            );
+            echo json_encode($response);
+            exit();
+        }
+        $password=md5($userinfo['hash'].$_POST['password']);
+        $date=date('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("UPDATE users SET password=?,update_time=? WHERE hash = ?");
+        $stmt->execute([$password,$date,$_SESSION[FM_SESSION_ID]['hash']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $response = array(
+            'status' => 'success',
+            'info' =>lng('Success')
+        );
+        echo json_encode($response);
+        exit();
     }
 
     // Upload
@@ -1628,6 +1654,12 @@ function fm_show_nav_path($path,$nav)
                     $root_url = "<a href='?p='>".lng('Home')." </a> ";
                 }elseif($nav=='users'){
                     $root_url = "<a href='?nav=users'>".lng('Users')." </a> ";
+                }elseif($nav=='logs'){
+                    $root_url = "<a href='?nav=logs'>".lng('Logs')." </a> ";
+                }elseif($nav=='settings'){
+                    $root_url = "<a href='?nav=settings'>".lng('Settings')." </a> ";
+                }else{
+                    $root_url = "<a href='?p='>".lng('Home')." </a> ";
                 }
                 
                 $sep = '/';
@@ -2058,6 +2090,36 @@ function fm_show_header($nav,$path)
             </div>
         </div>
     </div>
+
+    <!--修改密码-->
+    <div class="modal modal-blur fade" id="modal-password" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title"><?php echo lng('Change').lng('Password') ?></h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="change-password-form" novalidate>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label"><?php echo lng('Password') ?></label>
+                    <input type="password" class="form-control" name="password" placeholder="">
+                    <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a  class="btn btn-link link-secondary" data-bs-dismiss="modal">
+                    <?php echo lng('Cancel') ?>
+                </a>
+                <button type="submit"   class="btn btn-success ms-auto" data-bs-dismiss="modal">
+                    <?php echo lng('Save') ?> 
+                </button>
+            </div>
+            </form>
+        </div>
+        </div>
+    </div>
+
         <div class="page">
         <header class="navbar navbar-expand-md d-print-none" >
         <div class="container-xl">
