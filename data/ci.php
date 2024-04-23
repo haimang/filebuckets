@@ -1,0 +1,3 @@
+<?php
+echo 'ci';
+die;
