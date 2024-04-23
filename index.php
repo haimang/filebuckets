@@ -55,9 +55,9 @@ $online_viewer = 'Microsoft';
 $sticky_navbar = true;
 
 //不可以显示的目录
-$folders_not_display = array('data');
+$folders_not_display = array('data','.git');
 //不可显示的文件
-$file_not_display = array('index.php', '.htaccess', 'index1.php', 'tinyfilemanager.php');
+$file_not_display = array('index.php', '.htaccess', 'index1.php', 'tinyfilemanager.php','.gitignore');
 
 define('MAX_UPLOAD_SIZE', $max_upload_size_bytes);
 
@@ -68,7 +68,7 @@ if (!defined('FM_SESSION_ID')) {
     define('FM_SESSION_ID', 'hcfile');
 }
 
-$lang = 'zh-CN';
+$lang = 'en';
 
 $show_hidden_files = true;
 
@@ -962,7 +962,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         // ZIP info
         if($is_onlineViewer) {
             //现在本地文件线上不能访问 测试https://console.unifyestate.com/apartment-v2.7.xlsx
-            $file_url='https://console.unifyestate.com/apartment-v2.7.xlsx';
+            //$file_url='https://console.unifyestate.com/apartment-v2.7.xlsx';
             if($online_viewer == 'google') {
                 $html.= '<iframe src="https://docs.google.com/viewer?embedded=true&hl=en&url=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
             } else if($online_viewer == 'microsoft') {
