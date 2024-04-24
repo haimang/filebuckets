@@ -16,7 +16,7 @@ class sqliteDB
             path   CHAR(50),
             type   CHAR(10),
             status   INTEGER DEFAULT 1,
-            delete_perm INTEGER,
+            delete_perm INTEGER DEFAULT 1,
             add_time DATETIME,
             update_time DATETIME);
             CREATE TABLE files (
@@ -27,6 +27,7 @@ class sqliteDB
                 path CHAR(100),
                 size INTEGER,
                 ext CHAR(20),
+                status   INTEGER DEFAULT 1,
                 add_time DATETIME,
                 update_time DATETIME,
                 FOREIGN KEY (u_hash) REFERENCES users(hash));

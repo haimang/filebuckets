@@ -7,8 +7,8 @@
     },
     "user":{
         "delete_perm":{
-            "1":"软删除",
-            "2":"硬删除"
+            "1":"deletion",
+            "2":"Mark deletion"
         },
         "type":{
             "admin":"admin",

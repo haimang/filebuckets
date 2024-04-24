@@ -3,7 +3,7 @@ include_once "./data/routes.php";
 
 //初始化时生成基本的用户表
 include_once "./data/init.php";
-$pdo = new PDO('sqlite:data/test.db');
+$pdo = new PDO('sqlite:data/filebucket.db');
 
 define('VERSION', '0.0.1');
 
@@ -13,7 +13,7 @@ $default_timezone = 'Asia/Shanghai'; // UTC
 
 $iconv_input_encoding = 'UTF-8';
 
-$datetime_format = 'Y/m/d g:i A';
+$datetime_format = 'Y/m/d H:i:s';
 
 $max_upload_size_bytes = 5000000000; // size 5,000,000,000 bytes (~5GB)
 
@@ -61,7 +61,6 @@ $file_not_display = array('index.php', '.htaccess', 'index1.php', 'tinyfilemanag
 
 define('MAX_UPLOAD_SIZE', $max_upload_size_bytes);
 
-// upload chunk size
 define('UPLOAD_CHUNK_SIZE', $upload_chunk_size_bytes);
 
 if (!defined('FM_SESSION_ID')) {
@@ -165,12 +164,16 @@ $external = array(
     'css-style' => '<link href="data/dist/css/style.min.css" rel="stylesheet"/>',
     'css-dropzone' => '<link href="data/dist/css/dropzone.css" rel="stylesheet"/>',
     'css-toastr' => '<link href="data/dist/css/toastr.min.css" rel="stylesheet"/>',
+    'css-datatables'=>'<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/datatables.net-bs4/3.2.2/dataTables.bootstrap4.min.css" />',
     'js-toastr' => '<script src="data/dist/js/toastr.min.js"></script>',
     'js-tabler' => '<script src="data/dist/js/tabler.min.js"></script>',
     'js' => '<script src="data/dist/js/demo.min.js"></script>',
     'js-list' => '<script src="data/dist/js/list.min.js"></script>',
     'js-dropzone' => '<script src="data/dist/js/dropzone-min.js"></script>',
+    'js-bootstrap'=>'<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>',
     'js-jquery' => '<script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>',
+    'js-jquery-datatables' => '<script src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js" crossorigin="anonymous" defer></script>',
+    'js-bootstrap-datatables'=>'<script type="text/javascript" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap4.min.js"></script>',
     'icon-2000' => 'http://www.w3.org/2000/svg',
 );
 
@@ -199,12 +202,18 @@ if($use_auth){
                 $_SESSION[FM_SESSION_ID]['logged'] = $_POST['f_name'];
                 $_SESSION[FM_SESSION_ID]['path'] = $result['data']['path'];
                 $_SESSION[FM_SESSION_ID]['hash'] = $result['data']['hash'];
-                //fm_set_msg(lng('You are logged in'));
-                //echo $_SESSION[FM_SESSION_ID]['logged'];
+                $_SESSION[FM_SESSION_ID]['user'] = $result['data'];
+
+                //admin 初始密码是changeme 直接弹框修改密码，才能进行后面的存在
+                if($_POST['f_name']=='admin' && $_POST['f_password']=='changeme'){
+                    $_SESSION[FM_SESSION_ID]['is_first'] = 1;
+                }else{
+                    $_SESSION[FM_SESSION_ID]['is_first'] = 0;
+                }
+
                 fm_redirect(FM_SELF_URL);
             } else {
                 unset($_SESSION[FM_SESSION_ID]['logged']);
-                //fm_set_msg(lng('Login failed. Invalid username or password'), 'error');
                 fm_redirect(FM_SELF_URL);
             }
         } else {
@@ -299,7 +308,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
     //登录状态下
     if (isset($_SESSION[FM_SESSION_ID]['path'])) {
         $root_path = !empty($_SESSION[FM_SESSION_ID]['path']) ? $_SESSION[FM_SESSION_ID]['path'] : $root_path;
-        $html_path=!empty($_SESSION[FM_SESSION_ID]['path']) ? $_SESSION[FM_SESSION_ID]['path'] : $html_path;
+        $html_path = !empty($_SESSION[FM_SESSION_ID]['path']) ? $_SESSION[FM_SESSION_ID]['path'] : $html_path;
     }
 }
     $root_path = rtrim($root_path, '\\/');
@@ -384,10 +393,10 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     exit();
                 }
             }
+            $directory=$_POST['path']!=''?$_POST['path']:$_POST['name'];
 
-            $userinfo=registerUser($pdo,$_POST['name'],$_POST['password'],$_POST['email'],$_POST['path'],$_POST['type'],$_POST['delete_perm']);
+            $userinfo=registerUser($pdo,$_POST['name'],$_POST['password'],$directory,$_POST['email'],$_POST['type'],$_POST['delete_perm']);
             if(isset($userinfo['hash'])){
-                $directory=$_POST['path']!=''?$_POST['path']:$_POST['name'];
                 $directory=str_replace( '/', '', fm_clean_path( strip_tags( $directory ) ) );
                 
                 if (!is_dir($directory)){
@@ -412,12 +421,25 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
         //删除
         if (isset($_GET['del'], $_POST['token']) && !FM_READONLY) {
+            $path = FM_ROOT_PATH;
+            if (FM_PATH != '') {
+                $path .= '/' . FM_PATH;
+            }
+
             $hash=$_GET['del'];
             $stmt = $pdo->prepare("SELECT * FROM users WHERE hash = ?");
             $stmt->execute([$hash]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             if($user){
-
+                $flagstatus=isset($_POST['confirm'])?$_POST['confirm']:0;
+                if($flagstatus==1){
+                    fm_rdelete($path . '/' . $user['path']);
+                }
+                deleteUser($pdo,$user['hash'],$flagstatus);
+                $response = array(
+                    'status' => 'success',
+                    'info' =>lng('Delete').' '.lng('Success')
+                );
             }else{
                 $response = array(
                     'status' => 'alert',
@@ -425,7 +447,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                 );
             }
             echo json_encode($response);
-                exit();
+            exit();
         }
     }
 
@@ -451,6 +473,11 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             'status' => 'success',
             'info' =>lng('Success')
         );
+        if($_SESSION[FM_SESSION_ID]['is_first']==1){
+            if($_POST['password']!='changeme'){
+                $_SESSION[FM_SESSION_ID]['is_first']=0;
+            }
+        }
         echo json_encode($response);
         exit();
     }
@@ -467,20 +494,38 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             echo json_encode($response);exit();
         }
 
+        $dzuuid=isset($_POST['dzuuid'])?$_POST['dzuuid']:0;//分片id
         $chunkIndex = isset($_POST['dzchunkindex'])?$_POST['dzchunkindex']:0;
         $chunkTotal = isset($_POST['dztotalchunkcount'])?$_POST['dztotalchunkcount']:1;
         $fullPathInput = fm_clean_path($_REQUEST['fullpath']);
-
+        $dzuuids=[];
+        if($dzuuid!=0){
+            if(!$_SESSION[FM_SESSION_ID]['dzuuids']){
+                $_SESSION[FM_SESSION_ID]['dzuuids']=[];
+            }else{
+                $dzuuids=$_SESSION[FM_SESSION_ID]['dzuuids'];
+            }
+        }
+        
         $f = $_FILES;
-        $path = FM_ROOT_PATH;
+        
         $ds = DIRECTORY_SEPARATOR;
+        $path = FM_ROOT_PATH;
+        $sj_path = $html_path;//FM_ROOT_PATH;
         if (FM_PATH != '') {
             $path .= '/' . FM_PATH;
+            
+            if(!empty($sj_path))
+            {
+                $sj_path.='/' ; 
+            }
+            $sj_path.= FM_PATH;
         }
 
         $errors = 0;
         $uploads = 0;
         $allowed = (FM_UPLOAD_EXTENSION) ? explode(',', FM_UPLOAD_EXTENSION) : false;
+
         $response = array(
             'status' => 'error',
             'info' => 'Oops! Try again',
@@ -489,10 +534,13 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         $filename = $f['file']['name'];
         $tmp_name = $f['file']['tmp_name'];
         $ext = pathinfo($filename, PATHINFO_FILENAME) != '' ? strtolower(pathinfo($filename, PATHINFO_EXTENSION)) : '';
-        $isFileAllowed = ($allowed) ? in_array($ext, $allowed) : true;
 
+        $filesize = isset($_POST['dztotalfilesize'])?$_POST['dztotalfilesize']:fm_get_size($tmp_name);
+
+        $isFileAllowed = ($allowed) ? in_array($ext, $allowed) : true;
+        
         //文件名称
-        $fullPathInput=$filename;
+        /* $fullPathInput=$filename; */
 
         if (!fm_isvalid_filename($filename) && !fm_isvalid_filename($fullPathInput)) {
             $response = array(
@@ -535,7 +583,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                             }
                             $response = array(
                                 'status' => 'success',
-                                'info' => "file upload successful  11",
+                                'info' => "file upload successful",
                             );
                         } else {
                             $response = array(
@@ -550,7 +598,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
                         $response = array(
                             'status' => 'success',
-                            'info' => "file upload successful  22",
+                            'info' => "file upload successful",
                         );
                     } else {
                         $response = array(
@@ -576,7 +624,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     if (file_exists($fullPath)) {
                         $response = array(
                             'status' => 'success',
-                            'info' => "file upload successful 33",
+                            'info' => "file upload successful",
                         );
                     } else {
                         $response = array(
@@ -599,10 +647,14 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         }
 
         if($response['status']=='success'){
-            /* echo 'filename:'.$filename.'<br/>';
-            echo 'path:'.$path;die; */
-            //数据入库
-            addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$filename, 'file',$path);
+            
+            if($dzuuid==0 || !in_array($dzuuid,$dzuuids)){
+                if($dzuuid!=0){
+                    array_push($dzuuids,$dzuuid);
+                    $_SESSION[FM_SESSION_ID]['dzuuids']=$dzuuids;
+                }
+                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$filename, 'file',$sj_path,$filesize,$ext);
+            }
         }
         // Return the response
         echo json_encode($response);
@@ -614,29 +666,60 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         $del = str_replace( '/', '', fm_clean_path( $_GET['del'] ) );
         if ($del != '' && $del != '..' && $del != '.' && verifyToken($_POST['token'])) {
             $path = FM_ROOT_PATH;
+            $sj_path = $html_path;//FM_ROOT_PATH;
             if (FM_PATH != '') {
                 $path .= '/' . FM_PATH;
+                
+                if(!empty($sj_path))
+                {
+                    $sj_path.='/' ; 
+                }
+                $sj_path.= FM_PATH;
             }
             $is_dir = is_dir($path . '/' . $del);
-            if (fm_rdelete($path . '/' . $del)) {
-                //获取当前删除对象是否文件夹 --文件夹下面的文件一起删除
-                $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$del,$path);
-                $msg = $is_dir ? lng('Folder').' <b>%s</b> '.lng('Deleted') : lng('File').' <b>%s</b> '.lng('Deleted');
 
-                if($info || (isset($info['type']) && $info['type']=='folder')){
-                    //整个目录下的数据都删除
-                    deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],null,$path.'/'.$del.'%');
+            //查看当前用户删除权限是硬删除还是软删除
+            if($_SESSION[FM_SESSION_ID]['user']['delete_perm']==1 || $_SESSION[FM_SESSION_ID]['user']['type']=='admin'){
+                //硬删除
+                if (fm_rdelete($path . '/' . $del)) {
+                    //获取当前删除对象是否文件夹 --文件夹下面的文件一起删除
+                    $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$del,$sj_path);
+                    $msg = $is_dir ? lng('Folder').' <b>%s</b> '.lng('Deleted') : lng('File').' <b>%s</b> '.lng('Deleted');
+    
+                    if($info || (isset($info['type']) && $info['type']=='folder')){
+                        //整个目录下的数据都删除
+                        deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],null,$sj_path.'/'.$del.'%');
+                    }
+                    //数据更新
+                    deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$del,$sj_path);
+                    $response = array(
+                        'status' => 'success',
+                        'info' =>sprintf($msg, fm_enc($del))
+                    );
+                } else {
+                    $msg = $is_dir ? lng('Folder').' <b>%s</b> '.lng('not deleted') : lng('File').' <b>%s</b> '.lng('not deleted');
+                    $response = array(
+                        'status' => 'error',
+                        'info' =>sprintf($msg, fm_enc($del))
+                    );
                 }
-                //数据更新
-                deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$del,$path);
+            }else{
+                //软删除 --标记数据状态为-1
+                //获取当前删除对象是否文件夹 --文件夹下面的文件一起删除
+                $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$del,$sj_path);
+
+                if($info){
+                    if(isset($info['type']) && $info['type']=='folder'){
+                        //整个目录下的数据都删除
+                        updateStatusFolder($pdo,$_SESSION[FM_SESSION_ID]['hash'],$info['hash'],0);
+                    }
+                    //数据更新
+                    updateStatusFolder($pdo,$_SESSION[FM_SESSION_ID]['hash'],$info['hash'],0); 
+                }
+
+                $msg = $is_dir ? lng('Folder').' <b>%s</b> '.lng('Deleted') : lng('File').' <b>%s</b> '.lng('Deleted');
                 $response = array(
                     'status' => 'success',
-                    'info' =>sprintf($msg, fm_enc($del))
-                );
-            } else {
-                $msg = $is_dir ? lng('Folder').' <b>%s</b> '.lng('not deleted') : lng('File').' <b>%s</b> '.lng('not deleted');
-                $response = array(
-                    'status' => 'error',
                     'info' =>sprintf($msg, fm_enc($del))
                 );
             }
@@ -655,13 +738,20 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         $new = str_replace( '/', '', fm_clean_path( strip_tags( $_POST['newfilename'] ) ) );
         if (fm_isvalid_filename($new) && $new != '' && $new != '..' && $new != '.' && verifyToken($_POST['token'])) {
             $path = FM_ROOT_PATH;
+            $sj_path = $html_path;//FM_ROOT_PATH;
             if (FM_PATH != '') {
                 $path .= '/' . FM_PATH;
+
+                if(!empty($sj_path))
+                {
+                    $sj_path.='/' ; 
+                }
+                $sj_path.= FM_PATH;
             }
             
             if (fm_mkdir($path . '/' . $new, false) === true) {
                 //数据入库
-                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$new, 'folder',$path);
+                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$new, 'folder',$sj_path);
                 $response = array(
                     'status' => 'success',
                     'info' =>sprintf(lng('Folder').' <b>%s</b> '.lng('Created'), $new)
@@ -707,14 +797,21 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         $new = str_replace('/', '', $new);
         // path
         $path = FM_ROOT_PATH;
+        $sj_path = $html_path;//FM_ROOT_PATH;
         if (FM_PATH != '') {
             $path .= '/' . FM_PATH;
+            
+            if(!empty($sj_path))
+            {
+                $sj_path.='/' ; 
+            }
+            $sj_path.= FM_PATH;
         }
         // rename
         if (fm_isvalid_filename($new) && $old != '' && $new != '') {
             if (fm_rename($path . '/' . $old, $path . '/' . $new)) {
                 //数据更新
-                updateFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$old,$new,$path);
+                updateFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$old,$new,$sj_path);
                 $response = array(
                     'status' => 'success',
                     'info' =>sprintf(lng('Renamed from').' <b>%s</b> '. lng('to').' <b>%s</b>', fm_enc($old), fm_enc($new))
@@ -769,8 +866,15 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         }
 
         $path = FM_ROOT_PATH;
+        $sj_path = $html_path;//FM_ROOT_PATH;
         if (FM_PATH != '') {
             $path .= '/' . FM_PATH;
+            
+            if(!empty($sj_path))
+            {
+                $sj_path.='/' ; 
+            }
+            $sj_path.= FM_PATH;
         }
 
         $errors = 0;
@@ -780,18 +884,33 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             foreach ($files as $finfo) {
                 $f=$finfo->id;
                 if ($f != '') {
-                    $new_path = $path . '/' . $f;
-                    if (!fm_rdelete($new_path)) {
-                        $errors++;
+                    //查看当前用户删除权限是硬删除还是软删除
+                    if($_SESSION[FM_SESSION_ID]['user']['delete_perm']==1){
+                        //硬删除
+                        $new_path = $path . '/' . $f;
+                        if (!fm_rdelete($new_path)) {
+                            $errors++;
+                        }else{
+                            //获取当前删除对象是否文件夹 --文件夹下面的文件一起删除
+                            $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$sj_path);
+                            if($info || (isset($info['type']) && $info['type']=='folder')){
+                                //整个目录下的数据都删除
+                                deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],null,$sj_path.'/'.$f.'%');
+                            }
+                            //数据更新
+                            deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$sj_path);
+                        }
                     }else{
+                        //软删除 --标记数据状态为-1
                         //获取当前删除对象是否文件夹 --文件夹下面的文件一起删除
-                        $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$path);
+                        $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$del,$sj_path);
+
                         if($info || (isset($info['type']) && $info['type']=='folder')){
                             //整个目录下的数据都删除
-                            deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],null,$path.'/'.$f.'%');
+                            updateStatusFolder($pdo,$_SESSION[FM_SESSION_ID]['hash'],$info['hash'],0);
                         }
                         //数据更新
-                        deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$path);
+                        updateStatusFolder($pdo,$_SESSION[FM_SESSION_ID]['hash'],$info['hash'],0);
                     }
                 }
             }
@@ -828,13 +947,20 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         }
 
         $path = FM_ROOT_PATH;
-        $ext = 'zip';
+        $sj_path = $html_path;//FM_ROOT_PATH;
         if (FM_PATH != '') {
             $path .= '/' . FM_PATH;
+            
+            if(!empty($sj_path))
+            {
+                $sj_path.='/' ; 
+            }
+            $sj_path.= FM_PATH;
         }
+        $ext = 'zip';
 
-        //set pack type
-        $ext = isset($_POST['tar']) ? 'tar' : 'zip';
+        //set 打包 type
+        $ext = isset($_POST['type']) ? $_POST['type'] : 'zip';
 
         if (($ext == "zip" && !class_exists('ZipArchive')) || ($ext == "tar" && !class_exists('PharData'))) {
             $response = array(
@@ -897,7 +1023,9 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
             if ($res) {
                 //数据入库
-                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$zipname,'file',$path);
+                $filesize = fm_get_size($path.'/'.$zipname);
+                
+                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$zipname,'file',$sj_path,$filesize,$ext);
                 $response = array(
                     'status' => 'success',
                     'info' =>sprintf(lng('Archive').' <b>%s</b> '.lng('Created'), fm_enc($zipname))
@@ -1073,10 +1201,18 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
         // to 目标文件夹
         $copy_to_path = FM_ROOT_PATH;
+        $sj_copy_to_path = $html_path;//FM_ROOT_PATH;
         $copy_to = fm_clean_path($_POST['copy_to']);
         if ($copy_to != '') {
             $copy_to_path .= '/' . $copy_to;
+            if(!empty($sj_copy_to_path))
+            {
+                $sj_copy_to_path.='/' ; 
+            }
+            $sj_copy_to_path.= $copy_to;
         }
+
+
         if ($path == $copy_to_path) {
             //原路径和目标路径一样提醒
             $response = array(
@@ -1128,10 +1264,10 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     }else{
                         if($info){
                             //修改对应路径
-                            updateFolder($pdo,$_SESSION[FM_SESSION_ID]['hash'],$info['hash'],$copy_to_path);
+                            updateFolder($pdo,$_SESSION[FM_SESSION_ID]['hash'],$info['hash'],$sj_copy_to_path);
                         }else{
                             //新增入库
-                            addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,'file',$copy_to_path);
+                            addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,'file',$sj_copy_to_path);
                         }
                     }
                 } else {
@@ -1140,7 +1276,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                         $errors++;
                     }else{
                         //新增入库
-                        addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,'file',$copy_to_path);
+                        addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,'file',$sj_copy_to_path);
                     }
                 }
             }
@@ -1204,12 +1340,15 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
     
     if(isset($_GET['nav'])){
         if($_GET['nav']=='users'){
-            //获取用户列表
-            $query = "SELECT * FROM users";
-            // 执行查询并获取结果集
-            $stmt = $pdo->query($query);
-            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+            if($_SESSION[FM_SESSION_ID]['user']['type']=='admin'){
+                //获取用户列表
+                $query = "SELECT * FROM users";
+                // 执行查询并获取结果集
+                $stmt = $pdo->query($query);
+                $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }else{
+                $results=[];
+            }
             ?>
             <!-- Page body -->
         <div class="page-body">
@@ -1217,7 +1356,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             <div class="card">
               <div class="card-body">
                 <div id="table-default-users" class="table-responsive">
-                  <table class="table">
+                  <table class="table" id="table-list-users">
                     <thead>
                       <tr>
                         <th><button class="table-sort" data-sort="sort-name"><?php echo lng('Username') ?></button></th>
@@ -1241,7 +1380,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                         <td class="sort-operation">
                             <div class='btn-list flex-nowrap'>
                                 <?php if($row['name']!='admin'){ ?>
-                                <a  data-bs-toggle="modal" data-bs-target="#confirmDailog-modal" data-title="<?php echo lng('Delete').' '.lng('Users'); ?>" data-name="<?php echo $row['name']?>"  data-url="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($row['hash']) ?>"  class="btn btn-danger btn-icon btn-icon1" data-action="delete" aria-label="delete">
+                                <a  data-bs-toggle="modal" data-bs-target="#confirmDailog-user-modal" data-title="<?php echo lng('Delete').' '.lng('Users'); ?>" data-name="<?php echo $row['name']?>"  data-url="?nav=users&amp;del=<?php echo urlencode($row['hash']) ?>"  class="btn btn-danger btn-icon btn-icon1" data-action="delete" aria-label="delete">
                                     <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
                                 </a>
                                 <?php } ?>
@@ -1399,7 +1538,8 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                                     <th class="w-1"><input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Select all" onclick="checkbox_toggle()"></th>
                                     <th><button class="table-sort" data-sort="sort-name"><?php echo lng('Name') ?></button></th>
                                     <th class="w-8"><button class="table-sort" data-sort="sort-size"><?php echo lng('Size') ?></button></th>
-                                    <th class="w-8"><button class="table-sort" data-sort="sort-type"><?php echo lng('Ext') ?></button></th>
+                                    <th class="w-5"><button class="table-sort" data-sort="sort-type"><?php echo lng('Ext') ?></button></th>
+                                    <th class="w-8"><button class="table-sort" data-sort="sort-status"><?php echo lng('Status') ?></button></th>
                                     <th class="col-xl-2"><button class="table-sort" data-sort="sort-date"><?php echo lng('Date') ?></button></th>
                                     <th class="col-xl-2"><button class="table-sort" data-sort="sort-operation"><?php echo lng('Operation') ?></button></th>
                                 </tr>
@@ -1414,6 +1554,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     <td  data-sort><a href="?p=<?php echo urlencode($parent) ?>"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-left"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path></svg>..</a></td>
                     <td data-order></td>
                     <td data-order></td>
+                    <td ></td>
                     <td ></td>
                     <td ></td>
                 </tr>
@@ -1457,6 +1598,9 @@ $ii = 3000;
                                         </td>
                                         <td class="sort-type">
                                             <?php echo $filesize; ?>
+                                        </td>
+                                        <td class="sort-status">
+                                            
                                         </td>
                                         <td class="sort-date" data-date="<?php echo strtotime($modif);?>"><?php echo $modif ?></td>
                                         <td class="sort-operation">
@@ -1533,9 +1677,35 @@ flush();
                                             <?php echo $filesize; ?>
                                             </span></td>
                                         <td class="sort-type"><?php echo $ext ?></td>
+                                        <td class="sort-status">
+                                            <?php
+                                            $file_path='';
+                                            if(!empty($html_path)){
+                                                $file_path.=$html_path;
+                                            }
+                                            if(!empty(FM_PATH)){
+                                                if(!empty($file_path)){
+                                                    $file_path.='/';
+                                                }
+                                                $file_path.=FM_PATH;
+                                            }
+                                            $u_hash=null;
+                                            if($_SESSION[FM_SESSION_ID]['user']['type']=='admin'){
+                                                $u_hash=null;
+                                            }else{
+                                                $u_hash=$_SESSION[FM_SESSION_ID]['hash'];
+                                            }
+                                            $fileinfo=getFile_u($pdo,$f,$file_path,$u_hash);
+                                            
+                                            if(isset($fileinfo) &&  $fileinfo['status']==0){
+                                                echo '<span class="badge bg-red">'.lng('Deleted').'</span>';
+                                            }
+                                            ?>
+                                        </td>
                                         <td class="sort-date" data-date="<?php echo strtotime($modif);?>"><?php echo $modif ?></td>
                                         <td class="sort-operation">
                                         <div class='btn-list flex-nowrap'> 
+                                            <?php if(isset($fileinfo) && $fileinfo['status']==1){?>
                                                     <a  data-bs-toggle="modal" data-bs-target="#confirmDailog-modal" data-title="<?php echo lng('Delete').' '.lng('File'); ?>" data-name="<?php echo $f ?>"  data-url="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>"  class="btn btn-danger btn-icon btn-icon1" data-action="delete" aria-label="delete">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
                                                     </a>
@@ -1547,7 +1717,7 @@ flush();
                                                     <a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '<?php echo fm_enc(addslashes($f)) ?>','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>');return false;"  class="btn btn-lime btn-icon btn-icon1" aria-label="copy">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg>
                                                     </a>
-                                                
+                                                <? } ?>
                                                     <a href="<?php echo fm_enc(FM_ROOT_URL . (!empty($html_path)?'/'.$html_path:'' ).(FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank" class="btn btn-teal btn-icon btn-icon1" aria-label="link">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-link"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 15l6 -6"></path><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"></path><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"></path></svg>
                                                     </a>
@@ -1602,7 +1772,7 @@ flush();
                                             
                                         <li class="list-inline-item"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'zip');return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Zip') ?> </a></li>
 
-                                        <li class="list-inline-item"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'tar');return false;"  class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Tar') ?> </a></li>
+                                        <!-- <li class="list-inline-item"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'tar');return false;"  class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Tar') ?> </a></li> -->
 
                                         <li class="list-inline-item"><a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>',1);return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg> <?php echo lng('Copy') ?> </a></li>
                                     </ul>
@@ -1695,12 +1865,12 @@ function fm_show_nav_path($path,$nav)
                     <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
                     <?php echo lng('NewItem'); ?>
                   </a>
-                  <?php }elseif($nav=='users'){ ?>
+                  <?php }elseif($nav=='users'){ if($_SESSION[FM_SESSION_ID]['user']['type']=='admin'){ ?>
                     <a  class="btn" data-bs-toggle="modal" data-bs-target="#modal-users">
                     <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
-                    <?php echo lng('CreateUser'); ?>
+                    <?php echo lng('Create User'); ?>
                   </a>
-                 <?php } ?>
+                 <?php } } ?>
                 </div>
                 </div>
             </div>
@@ -1748,7 +1918,9 @@ function fm_show_header($nav,$path)
     <?php print_external('css-tabler-vendors');?>
     <?php print_external('css-bootstrap');?>
     <?php print_external('css-style');?>
-    <?php print_external('css-toastr');?> 
+    <?php print_external('css-toastr');?>
+    <?php print_external('css-datatables');?>
+    
     <script type="text/javascript">window.csrf = '<?php echo $_SESSION['token']; ?>';</script>
     <style>
         @import url('https://rsms.me/inter/inter.css');
@@ -1772,6 +1944,13 @@ function fm_show_header($nav,$path)
         code{
             padding:2px 0;
         }
+        .offcanvas,.offcanvas-lg,.offcanvas-md,.offcanvas-sm,.offcanvas-xl,.offcanvas-xxl {
+            --tblr-offcanvas-width:680px;
+            }
+        .datagrid {
+            --tblr-datagrid-item-width:30rem;
+        }
+        .line{border-bottom:var(--tblr-border-width) var(--tblr-border-style) rgba(4,32,69,.14);height: 2px;padding:1rem 0 0 0;}
     </style>
 </head>
 <body data-bs-theme="<?php echo $getTheme;?>">
@@ -1899,7 +2078,36 @@ function fm_show_header($nav,$path)
                     <div class="modal-body other-div">
                         <div class="mb-3">
                             <label class="form-label"><?php echo lng('Name') ?></label>
-                            <input type="text" class="form-control" name="packname" placeholder="Pack name">
+                            <input type="text" class="form-control" name="packname" placeholder="<?php echo lng('Archive') ?> <?php echo lng('Name') ?>">
+                        </div>
+                        <label class="form-label"></label>
+                        <div class="form-selectgroup-boxes row">
+                            <div class="col-lg-3">
+                                <label class="form-selectgroup-item">
+                                <input type="radio" name="type" value="zip" class="form-selectgroup-input" checked>
+                                <span class="form-selectgroup-label d-flex align-items-center p-3">
+                                    <span class="me-3">
+                                    <span class="form-selectgroup-check"></span>
+                                    </span>
+                                    <span class="form-selectgroup-label-content">
+                                    <span class="form-selectgroup-title strong mb-1"><?php echo lng('Zip') ?></span>
+                                    </span>
+                                </span>
+                                </label>
+                            </div>
+                            <div class="col-lg-3">
+                                <label class="form-selectgroup-item">
+                                <input type="radio" name="type" value="tar" class="form-selectgroup-input">
+                                <span class="form-selectgroup-label d-flex align-items-center p-3">
+                                    <span class="me-3">
+                                    <span class="form-selectgroup-check"></span>
+                                    </span>
+                                    <span class="form-selectgroup-label-content">
+                                    <span class="form-selectgroup-title strong mb-1"><?php echo lng('Tar') ?></span>
+                                    </span>
+                                </span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-body delete-div  text-center py-4">
@@ -1912,19 +2120,19 @@ function fm_show_header($nav,$path)
                     <input type="hidden" name="file" value="">
                     <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
                     <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><?php echo lng('Cancel') ?></button>
-                    <button type="submit" class="btn btn-primary" data-bs-dismiss="modal"><?php echo lng('Okay') ?> </button>
+                    <button type="submit" class="btn btn-primary" data-bs-dismiss="modal"><?php echo lng('Execute') ?> </button>
                 </div>
             </form>
             </div>
         </div>
     </div>
 
-    <!--复制-->
+    <!--复制或移动-->
     <div class="modal modal-blur fade" id="modal-copy" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-            <h5 class="modal-title"><?php echo lng('Copy') ?> </h5>
+            <h5 class="modal-title"><?php echo lng('Copy or Move Files') ?> </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" id="copy-file-form" novalidate>
@@ -1942,12 +2150,12 @@ function fm_show_header($nav,$path)
                     <label class="form-label"><?php echo lng('DestinationFolder') ?>：</label>
                     <div class="input-group mb-2">
                         <span class="input-group-text" id="path-folder">/</span>
-                        <input type="text" name="copy_to" id="copy_to" class="form-control" placeholder="username">
+                        <input type="text" name="copy_to" id="copy_to" class="form-control" placeholder="mind/nested/folder">
                     </div>
                 </div>
                 <label class="form-label"></label>
-                <div class="form-selectgroup-boxes row mb-3">
-                    <div class="col-lg-2">
+                <div class="form-selectgroup-boxes row">
+                    <div class="col-lg-3">
                         <label class="form-selectgroup-item">
                         <input type="radio" name="copy_type" value="1" class="form-selectgroup-input" checked>
                         <span class="form-selectgroup-label d-flex align-items-center p-3">
@@ -1960,7 +2168,7 @@ function fm_show_header($nav,$path)
                         </span>
                         </label>
                     </div>
-                    <div class="col-lg-2">
+                    <div class="col-lg-3">
                         <label class="form-selectgroup-item">
                         <input type="radio" name="copy_type" value="2" class="form-selectgroup-input">
                         <span class="form-selectgroup-label d-flex align-items-center p-3">
@@ -1978,7 +2186,7 @@ function fm_show_header($nav,$path)
             <div class="modal-footer">
                 <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
                 <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><?php echo lng('Cancel') ?></button>
-                <button type="submit" class="btn btn-success" data-bs-dismiss="modal"><?php echo lng('Okay') ?></button>
+                <button type="submit" class="btn btn-success" data-bs-dismiss="modal"><?php echo lng('Execute') ?></button>
             </div>
             </form>
         </div>
@@ -1990,7 +2198,7 @@ function fm_show_header($nav,$path)
         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-            <h5 class="modal-title"><?php echo lng('CreateUser') ?></h5>
+            <h5 class="modal-title"><?php echo lng('Create User') ?></h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" id="create-user-form" novalidate>
@@ -2033,8 +2241,8 @@ function fm_show_header($nav,$path)
                         <div class="mb-3">
                         <label class="form-label"><?php echo lng('DeletePermissions') ?></label>
                         <select class="form-select" name="delete_perm">
-                            <option value="1" selected>软删除</option>
-                            <option value="2">硬删除</option>
+                            <option value="1" selected><?php echo lng('deletion') ?></option>
+                            <option value="2" ><?php echo lng('Mark deletion') ?></option>
                         </select>
                         </div>
                     </div>
@@ -2055,16 +2263,55 @@ function fm_show_header($nav,$path)
         </div>
     </div>
 
+    <!--删除用户提醒-->
+    <div id="confirmDailog-div">
+        <div class="modal modal-blur fade confirmDailog" id="confirmDailog-user-modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document" >
+            <div class="modal-content">
+                <form id="confirmDailog-user-form" method="post"  action="<%this.action%>">
+                <div class="modal-status bg-danger"></div>
+                <div class="modal-body  text-center py-4">
+                    <svg xmlns="<?php print_external('icon-2000');?>" class="icon mb-2 text-danger icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.24 3.957l-8.422 14.06a1.989 1.989 0 0 0 1.7 2.983h16.845a1.989 1.989 0 0 0 1.7 -2.983l-8.423 -14.06a1.989 1.989 0 0 0 -3.4 0z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+                    <h3><?php echo lng('Are you sure?') ?> </h3>
+                    <div class="text-muted modal-content-t"><%this.content%></div>
+                    <div class="form-selectgroup-boxes row mt-3">
+                        <div class="col-lg-12">
+                            <label class="form-selectgroup-item">
+                            <input type="radio" name="confirm" value="1" class="form-selectgroup-input">
+                            <span class="form-selectgroup-label d-flex align-items-center p-3">
+                                <span class="me-3">
+                                <span class="form-selectgroup-check"></span>
+                                </span>
+                                <span class="form-selectgroup-label-content">
+                                <span class="form-selectgroup-title strong mb-1"><?php echo lng('Confirm deleting all uploaded files related to the user') ?></span>
+                                </span>
+                            </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><?php echo lng('Cancel') ?></button>
+                    <button type="submit" class="btn btn-danger" data-bs-dismiss="modal"><?php echo lng('Okay') ?> </button>
+                </div>
+            </form>
+            </div>
+        </div>
+        </div>
+    </div>
+
     <!--详情-->
     <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas" aria-labelledby="offcanvasEndLabel">
         <div class="offcanvas-header">
             <h2 class="offcanvas-title" id="offcanvasEndLabel" style="word-wrap: break-word;"><?php echo lng('Details') ?></h2>
-            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas" aria-label="Close"><?php echo lng('Close') ?> </button>
         </div>
         <div class="offcanvas-body">
             <div id="offcanvas-content">
                 
             </div>
+            <div class="line"></div>
             <div class="datagrid" style="margin-top: 1rem;">
                 <div class="datagrid-item">
                     <div class="datagrid-title"><?php echo lng('Name') ?> </div>
@@ -2084,9 +2331,6 @@ function fm_show_header($nav,$path)
                 </div>
             </div>
             <div class="mt-3">
-                <button class="btn btn-primary" type="button" data-bs-dismiss="offcanvas">
-                    <?php echo lng('Close') ?> 
-                </button>
             </div>
         </div>
     </div>
@@ -2246,7 +2490,9 @@ function fm_show_footer()
     <?php print_external('js');?>
     <?php print_external('js-jquery');?>
     <?php print_external('js-toastr');?>
+    <?php print_external('js-bootstrap');?>
     <script>
+        var is_first="<?php echo isset($_SESSION[FM_SESSION_ID]['is_first'])?$_SESSION[FM_SESSION_ID]['is_first']:0;?>";
         function toast(type,txt) {console.log(type); if(type=='success'){toastr.success(txt);} else if(type=='error'){toastr.error(txt);}else if(type=='alert'){toastr.warning(txt);}else{toastr.info(txt);} }
         function rename(e, t) { if(t) { $("#js-rename-from").val(t);$("#js-rename-to").val(t); $("#modal-rename").modal('show'); } }
         function change_checkboxes(e, t) { for (var n = e.length - 1; n >= 0; n--) e[n].checked = "boolean" == typeof t ? t : !e[n].checked }
@@ -2265,7 +2511,7 @@ function fm_show_footer()
                     if(content==''){
                         content+=this.value;
                     }else{
-                        content+=','+this.value;
+                        content+=', '+this.value;
                     }
                 });
             }else{
@@ -2395,6 +2641,12 @@ function fm_show_footer()
                 listClass: 'table-tbody',
                 valueNames: [ 'sort-name', 'sort-size', 'sort-type',{ attr: 'data-date', name: 'sort-date' }]
             });
+
+            const list1 = new List('table-default-users', {
+                sortClass: 'table-sort',
+                listClass: 'table-tbody',
+                valueNames: [ 'sort-name', 'sort-email', 'sort-type',{ attr: 'data-date', name: 'sort-date' }]
+            });
         })
 
         //上传弹框关闭
@@ -2424,7 +2676,57 @@ function fm_show_footer()
             modal.find('.modal-body .modal-content-t').html(a.data('title')+' '+a.data('name'));
         });
 
+        //确认删除用户
+        $('#confirmDailog-user-modal').on('show.bs.modal', function (event) {
+            var modal = $(this);  //get modal itself
+            var a = $(event.relatedTarget)
+            console.log(a.data('url'));
+            if(a.data('action')=='delete'){
+                modal.find('.modal-content #confirmDailog-user-form').attr('novalidate',true);
+                modal.find('.modal-content #confirmDailog-user-form').attr('data-type','delete');
+            }
+
+            modal.find('.modal-content #confirmDailog-user-form').attr('action',a.data('url'));
+            modal.find('.modal-body .modal-content-t').html(a.data('title')+' '+a.data('name'));
+        });
+
+        //文件上传加载
+        Dropzone.options.fileUploader = {
+            chunking: true,//分片上传
+            chunkSize: <?php echo UPLOAD_CHUNK_SIZE; ?>,//分片上传大小
+            timeout: 120000,
+            maxFilesize: <?php echo MAX_UPLOAD_SIZE; ?>,
+            acceptedFiles : "<?php echo getUploadExt() ?>",
+            init: function () {
+                this.on("sending", function (file, xhr, formData) {
+                    let _path = (file.fullPath) ? file.fullPath : file.name;
+                    document.getElementById("fullpath").value = _path;
+                    xhr.ontimeout = (function() {
+                        toast('error','Error: Server Timeout');
+                    });
+                }).on("success", function (res) {
+                    let _response = JSON.parse(res.xhr.response);
+                    console.log(_response);
+                    if(_response.status == "error") {
+                        toast(_response.status,_response.info);
+                    }
+                }).on("error", function(file, response) {
+                    toast("error",response);
+                });
+            }
+        };
+
         $(document).ready( function () {
+            if(is_first==1){
+                $("#modal-password").modal('show');
+            }
+
+            // dataTable init
+            /* $('#table-list-users').DataTable({
+                searching: false, // 设置为 false 不加载搜索输入框
+                bLengthChange:false,
+            }); */
+
             if($("#col-images").length!=0){
                 $(".col-images .text-muted").html($("#col-images").val());
                 $(".col-videos .text-muted").html($("#col-videos").val());
@@ -2521,13 +2823,48 @@ function fm_show_footer()
                 });
             });
 
-            //
+            //添加用户
             $("#create-user-form").on('submit',function(e){
                 e.preventDefault();
                 var form = new FormData($(this)[0]);
                 $.ajax({
                     type: "POST",
                     url: window.location,
+                    data: form,
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                    success: function(mes){mes=JSON.parse(mes); toast(mes.status,mes.info); if(mes.status=='success'){window.location.reload();}},
+                    failure: function(mes) {toast('error',"Error: try again");},
+                    error: function(mes) {toast('error',mes.responseText);}
+                });
+            });
+
+            //修改密码
+            $("#change-password-form").on('submit',function(e){
+                e.preventDefault();
+                var form = new FormData($(this)[0]);
+                $.ajax({
+                    type: "POST",
+                    url: window.location,
+                    data: form,
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                    success: function(mes){mes=JSON.parse(mes); toast(mes.status,mes.info); if(mes.status=='success'){window.location.reload();}},
+                    failure: function(mes) {toast('error',"Error: try again");},
+                    error: function(mes) {toast('error',mes.responseText);}
+                });
+            });
+
+            //提醒【删除用户】提交
+            $("#confirmDailog-user-form").on('submit',function(e){
+                e.preventDefault();
+                var form = new FormData($(this)[0]);
+                var url=$("#confirmDailog-user-form").attr('action');
+                $.ajax({
+                    type: "POST",
+                    url: url,
                     data: form,
                     cache: false,
                     contentType: false,

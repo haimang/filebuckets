@@ -1,7 +1,7 @@
 <?php
 
 include_once('data/init.php');
-$pdo = new PDO('sqlite:data/test.db');
+$pdo = new PDO('sqlite:data/filebucket.db');
 
 $type=$_GET['type'];
 $fun_arr=['login','logout','addUser','lists','download','upload','createFolder','upload','createFolder','rename','delete'];

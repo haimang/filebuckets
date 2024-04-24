@@ -23,6 +23,20 @@ function registerUser($db, $username, $password, $path = '',$email='',$type='',$
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     return $user;
 }
+//删除用户
+function deleteUser($db,$hash,$flag){
+    $stmt = $db->prepare("DELETE FROM users WHERE hash=?");
+    $stmt->execute([$hash]);
+    if($flag==1){
+        //对应的文件夹删除
+        $stmt = $db->prepare("DELETE FROM files WHERE u_hash = ?");
+        $stmt->execute([$hash]);
+    }else{
+        //文件保留
+    }
+    //是否
+    return true;
+}
 
 // 用户登录的例子
 function loginUser($db, $username, $password)
@@ -39,14 +53,14 @@ function loginUser($db, $username, $password)
     return ['code'=>0,'data'=>false];
 }
 //文件数据插入
-function addFile($db,$u_hash,$name,$type='file',$path=null){
+function addFile($db,$u_hash,$name,$type='file',$path=null,$size='',$ext=''){
     $hash =create_hash('document',$type);
     $time=date('Y-m-d H:i:s');
     //$f_hash=null;
     
     // 插入文件数据
-    $stmt = $db->prepare("INSERT INTO files (hash,u_hash,name,type,path,add_time, update_time) VALUES (?,?,?,?,?,?,?)");
-    $stmt->execute([$hash,$u_hash,$name, $type, $path,$time,$time]);
+    $stmt = $db->prepare("INSERT INTO files (hash,u_hash,name,type,path,size,ext,add_time, update_time) VALUES (?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$hash,$u_hash,$name, $type, $path,$size,$ext,$time,$time]);
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
     return $file;
 }
@@ -77,6 +91,19 @@ function updateFolder($db,$u_hash,$hash,$path){
     return $info;
 }
 
+//修改文件状态
+function updateStatusFolder($db,$u_hash,$hash,$status){
+    //修改时间更新
+    $stmt = $db->prepare("UPDATE files SET status=?,update_time=?  WHERE u_hash = ? AND hash=?");
+    $update_time=date('Y-m-d H:i:s');
+    $stmt->execute([$status,$update_time,$u_hash,$hash]);
+
+    $stmt = $db->prepare("SELECT * FROM files WHERE u_hash = ? AND hash=?");
+    $stmt->execute([$u_hash,$hash]);
+    $info = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $info;
+}
+
 //搜索
 function getSearchFile($db,$u_hash,$keyword) {
     
@@ -86,6 +113,20 @@ function getSearchFile($db,$u_hash,$keyword) {
 function getFile($db,$u_hash,$name,$path=null) {
     $stmt = $db->prepare("SELECT * FROM files WHERE  u_hash = ? AND name=? AND path=?");
     $stmt->execute([$u_hash,$name, $path]);
+    
+    $file = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $file;
+}
+
+function getFile_u($db,$name,$path=null,$u_hash=null) {
+    if(is_null($u_hash)){
+        $stmt = $db->prepare("SELECT * FROM files WHERE  name=? AND path=?");
+        $stmt->execute([$name, $path]);
+    }else{
+        $stmt = $db->prepare("SELECT * FROM files WHERE  u_hash = ? AND name=? AND path=?");
+        $stmt->execute([$u_hash,$name, $path]);
+    }
+    
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
     return $file;
 }
@@ -179,7 +220,7 @@ $sqlSelect = <<<EOF
           SELECT * from users;
 EOF;
 
-$db = new sqliteDB("data/test.db");
+$db = new sqliteDB("data/filebucket.db");
 
 /*
  * $db = new sqliteDB(':memory:');
@@ -196,10 +237,10 @@ foreach ($db->queryDB($sqlSelect) as $value) {
 if (!$isNull) {
     //增加数据
     $auth_users = array(
-        array('name' => 'admin', 'password' => 'a123456', 'path' => '','email'=>'admin@haimang.com','type'=>'admin'),
-        array('name' => 'user', 'password' => '123456', 'path' => 'user','email'=>'user@haimang.com','type'=>'third'),
+        array('name' => 'admin', 'password' => 'changeme', 'path' => '','email'=>'admin@haimang.com','type'=>'admin'),
+        /* array('name' => 'user', 'password' => '123456', 'path' => 'user','email'=>'user@haimang.com','type'=>'third'), */
     );
-    $pdo = new PDO('sqlite:data/test.db');
+    $pdo = new PDO('sqlite:data/filebucket.db');
     foreach ($auth_users as $item) {
         //echo $user['name'];die;
         $user=registerUser($pdo, $item['name'], $item['password'], $item['path'],$item['email'],$item['type']);
