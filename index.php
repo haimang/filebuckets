@@ -4168,5 +4168,3 @@ function lng($txt)
     }
 
 }
-
-?>
