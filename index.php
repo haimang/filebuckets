@@ -57,7 +57,7 @@ $sticky_navbar = true;
 //不可以显示的目录
 $folders_not_display = array('data','.git');
 //不可显示的文件
-$file_not_display = array('index.php', '.htaccess', 'index1.php', 'tinyfilemanager.php','.gitignore');
+$file_not_display = array('index.php', '.htaccess', 'tinyfilemanager.php','.gitignore');
 
 define('MAX_UPLOAD_SIZE', $max_upload_size_bytes);
 
@@ -274,12 +274,6 @@ if($use_auth){
                         </span>
                         </div>
                     </div>
-                    <!-- <div class="mb-2">
-                        <label class="form-check">
-                        <input type="checkbox" class="form-check-input"/>
-                        <span class="form-check-label">Remember me on this device</span>
-                        </label>
-                    </div> -->
                     <div class="form-footer">
                         <input type="hidden" name="token" value="<?php echo htmlentities($_SESSION['token']); ?>" />
                         <button type="submit" class="btn btn-primary w-100"><?php echo lng('Login'); ?></button>
@@ -884,21 +878,20 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             foreach ($files as $finfo) {
                 $f=$finfo->id;
                 if ($f != '') {
-                    //查看当前用户删除权限是硬删除还是软删除
-                    if($_SESSION[FM_SESSION_ID]['user']['delete_perm']==1){
-                        //硬删除
-                        $new_path = $path . '/' . $f;
+                    $new_path = $path . '/' . $f;
+                     //查看当前用户删除权限是硬删除还是软删除
+                    if($_SESSION[FM_SESSION_ID]['user']['delete_perm']==1 || $_SESSION[FM_SESSION_ID]['user']['type']=='admin'){
                         if (!fm_rdelete($new_path)) {
                             $errors++;
                         }else{
                             //获取当前删除对象是否文件夹 --文件夹下面的文件一起删除
-                            $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$sj_path);
+                            $info=getFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$path);
                             if($info || (isset($info['type']) && $info['type']=='folder')){
                                 //整个目录下的数据都删除
-                                deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],null,$sj_path.'/'.$f.'%');
+                                deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],null,$path.'/'.$f.'%');
                             }
                             //数据更新
-                            deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$sj_path);
+                            deleteFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f,$path);
                         }
                     }else{
                         //软删除 --标记数据状态为-1
@@ -1349,6 +1342,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
             }else{
                 $results=[];
             }
+
             ?>
             <!-- Page body -->
         <div class="page-body">
@@ -1705,7 +1699,7 @@ flush();
                                         <td class="sort-date" data-date="<?php echo strtotime($modif);?>"><?php echo $modif ?></td>
                                         <td class="sort-operation">
                                         <div class='btn-list flex-nowrap'> 
-                                            <?php if(isset($fileinfo) && $fileinfo['status']==1){?>
+                                            <?php if(isset($fileinfo) && $fileinfo['status']==1){ ?>
                                                     <a  data-bs-toggle="modal" data-bs-target="#confirmDailog-modal" data-title="<?php echo lng('Delete').' '.lng('File'); ?>" data-name="<?php echo $f ?>"  data-url="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>"  class="btn btn-danger btn-icon btn-icon1" data-action="delete" aria-label="delete">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
                                                     </a>
@@ -1717,7 +1711,7 @@ flush();
                                                     <a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '<?php echo fm_enc(addslashes($f)) ?>','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>');return false;"  class="btn btn-lime btn-icon btn-icon1" aria-label="copy">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg>
                                                     </a>
-                                                <? } ?>
+                                                <?php } ?>
                                                     <a href="<?php echo fm_enc(FM_ROOT_URL . (!empty($html_path)?'/'.$html_path:'' ).(FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank" class="btn btn-teal btn-icon btn-icon1" aria-label="link">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-link"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 15l6 -6"></path><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"></path><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"></path></svg>
                                                     </a>
@@ -4168,3 +4162,4 @@ function lng($txt)
     }
 
 }
+?>
