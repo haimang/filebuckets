@@ -646,7 +646,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                             }
                             $response = array(
                                 'status' => 'success',
-                                'info' => "1 file upload successful ".$filename,
+                                'info' => "file upload successful",
                             );
                         } else {
                             $response = array(
@@ -661,7 +661,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
                         $response = array(
                             'status' => 'success',
-                            'info' => "2 file upload successful ".$fullPathInput,
+                            'info' => "file upload successful ",
                         );
                     } else {
                         $response = array(
@@ -687,7 +687,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     if (file_exists($fullPath)) {
                         $response = array(
                             'status' => 'success',
-                            'info' => "3 file upload successful ".$filename,
+                            'info' => "file upload successful",
                         );
                     } else {
                         $response = array(
