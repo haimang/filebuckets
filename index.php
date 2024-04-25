@@ -1449,7 +1449,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                                         <?php echo lng('Images') ?>
                                     </div>
                                     <div class="text-muted">
-                                        12 waiting payments
+                                        <?php echo lng('Calculating File Sizes') ?>
                                     </div>
                                 </div>
                             </div>
@@ -1471,7 +1471,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                                     <?php echo lng('Videos') ?>
                                     </div>
                                     <div class="text-muted">
-                                        32 shipped
+                                    <?php echo lng('Calculating File Sizes') ?>
                                     </div>
                                 </div>
                             </div>
@@ -1493,7 +1493,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                                         <?php echo lng('Documents') ?>
                                     </div>
                                     <div class="text-muted">
-                                        163 registered today
+                                    <?php echo lng('Calculating File Sizes') ?>
                                     </div>
                                 </div>
                             </div>
@@ -1515,7 +1515,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                                     <?php echo lng('OtherFiles') ?>
                                     </div>
                                     <div class="text-muted">
-                                        16 waitings
+                                    <?php echo lng('Calculating File Sizes') ?>
                                     </div>
                                 </div>
                             </div>
@@ -1673,33 +1673,37 @@ flush();
                                         <td class="sort-type"><?php echo $ext ?></td>
                                         <td class="sort-status">
                                             <?php
-                                            $file_path='';
-                                            if(!empty($html_path)){
-                                                $file_path.=$html_path;
-                                            }
-                                            if(!empty(FM_PATH)){
-                                                if(!empty($file_path)){
-                                                    $file_path.='/';
-                                                }
-                                                $file_path.=FM_PATH;
-                                            }
-                                            $u_hash=null;
-                                            if($_SESSION[FM_SESSION_ID]['user']['type']=='admin'){
-                                                $u_hash=null;
+                                            if($ext=='part'){
+                                                echo '<span class="badge bg-orange">'.lng('Uploading').'</span>';
                                             }else{
-                                                $u_hash=$_SESSION[FM_SESSION_ID]['hash'];
-                                            }
-                                            $fileinfo=getFile_u($pdo,$f,$file_path,$u_hash);
-                                            
-                                            if(isset($fileinfo) &&  $fileinfo['status']==0){
-                                                echo '<span class="badge bg-red">'.lng('Deleted').'</span>';
+                                                $file_path='';
+                                                if(!empty($html_path)){
+                                                    $file_path.=$html_path;
+                                                }
+                                                if(!empty(FM_PATH)){
+                                                    if(!empty($file_path)){
+                                                        $file_path.='/';
+                                                    }
+                                                    $file_path.=FM_PATH;
+                                                }
+                                                $u_hash=null;
+                                                if($_SESSION[FM_SESSION_ID]['user']['type']=='admin'){
+                                                    $u_hash=null;
+                                                }else{
+                                                    $u_hash=$_SESSION[FM_SESSION_ID]['hash'];
+                                                }
+                                                $fileinfo=getFile_u($pdo,$f,$file_path,$u_hash);
+                                                
+                                                if(isset($fileinfo) && isset($fileinfo['status']) && $fileinfo['status']==0){
+                                                    echo '<span class="badge bg-red">'.lng('Deleted').'</span>';
+                                                }
                                             }
                                             ?>
                                         </td>
                                         <td class="sort-date" data-date="<?php echo strtotime($modif);?>"><?php echo $modif ?></td>
                                         <td class="sort-operation">
                                         <div class='btn-list flex-nowrap'> 
-                                            <?php if(isset($fileinfo) && $fileinfo['status']==1){ ?>
+                                            <?php if($ext!='part'){ if(!(isset($fileinfo) && isset($fileinfo['status']) && $fileinfo['status']==0)){ ?>
                                                     <a  data-bs-toggle="modal" data-bs-target="#confirmDailog-modal" data-title="<?php echo lng('Delete').' '.lng('File'); ?>" data-name="<?php echo $f ?>"  data-url="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($f) ?>"  class="btn btn-danger btn-icon btn-icon1" data-action="delete" aria-label="delete">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
                                                     </a>
@@ -1719,6 +1723,7 @@ flush();
                                                     <a  data-bs-toggle="modal" data-bs-target="#confirmDailog-modal" data-title="<?php echo lng('Download'); ?>" data-name="<?php echo urlencode($f) ?>"  data-url="?p=<?php echo urlencode(FM_PATH) ?>&amp;dl=<?php echo urlencode($f) ?>" class="btn btn-cyan btn-icon btn-icon1" data-action="download" aria-label="download">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path><path d="M7 11l5 5l5 -5"></path><path d="M12 4l0 12"></path></svg>
                                                     </a>
+                                                    <?php } ?>
                                             </div>
                                         </td>
                                     </tr>
@@ -2227,7 +2232,7 @@ function fm_show_header($nav,$path)
                         <div class="mb-3">
                         <label class="form-label"><?php echo lng('Path') ?></label>
                         <div class="input-group input-group-flat">
-                            <input type="text" class="form-control ps-0" name="path"  value="" autocomplete="off">
+                            <input type="text" class="form-control" name="path"  value="" autocomplete="off">
                         </div>
                         </div>
                     </div>
@@ -4039,115 +4044,10 @@ function fm_isvalid_filename($text)
 function lng($txt)
 {
     global $lang;
-
-    // English Language
-    $tr['en']['AppName'] = 'Tiny File Manager';
-    $tr['en']['AppTitle'] = 'File Manager';
-    $tr['en']['Login'] = 'Sign in';
-    $tr['en']['Username'] = 'Username';
-    $tr['en']['Password'] = 'Password';
-    $tr['en']['Logout'] = 'Sign Out';
-    $tr['en']['Move'] = 'Move';
-    $tr['en']['Copy'] = 'Copy';
-    $tr['en']['Save'] = 'Save';
-    $tr['en']['SelectAll'] = 'Select all';
-    $tr['en']['UnSelectAll'] = 'Unselect all';
-    $tr['en']['File'] = 'File';
-    $tr['en']['Back'] = 'Back';
-    $tr['en']['Size'] = 'Size';
-    $tr['en']['Perms'] = 'Perms';
-    $tr['en']['Modified'] = 'Modified';
-    $tr['en']['Owner'] = 'Owner';
-    $tr['en']['Search'] = 'Search';
-    $tr['en']['NewItem'] = 'New folder';
-    $tr['en']['Folder'] = 'Folder';
-    $tr['en']['Delete'] = 'Delete';
-    $tr['en']['Rename'] = 'Rename';
-    $tr['en']['CopyTo'] = 'Copy to';
-    $tr['en']['DirectLink'] = 'Direct link';
-    $tr['en']['UploadingFiles'] = 'Upload Files';
-    $tr['en']['ChangePermissions'] = 'Change Permissions';
-    $tr['en']['Copying'] = 'Copying';
-    $tr['en']['CreateNewItem'] = 'Create New Item';
-    $tr['en']['Name'] = 'Name';
-    $tr['en']['AdvancedEditor'] = 'Advanced Editor';
-    $tr['en']['Actions'] = 'Actions';
-    $tr['en']['Folder is empty'] = 'Folder is empty';
-    $tr['en']['Upload'] = 'Upload';
-    $tr['en']['Cancel'] = 'Cancel';
-    $tr['en']['InvertSelection'] = 'Invert Selection';
-    $tr['en']['DestinationFolder'] = 'Destination Folder';
-    $tr['en']['ItemType'] = 'Item Type';
-    $tr['en']['ItemName'] = 'Item Name';
-    $tr['en']['CreateNow'] = 'Create Now';
-    $tr['en']['Download'] = 'Download';
-    $tr['en']['Open'] = 'Open';
-    $tr['en']['UnZip'] = 'UnZip';
-    $tr['en']['UnZipToFolder'] = 'UnZip to folder';
-    $tr['en']['Edit'] = 'Edit';
-    $tr['en']['NormalEditor'] = 'Normal Editor';
-    $tr['en']['BackUp'] = 'Back Up';
-    $tr['en']['SourceFolder'] = 'Source Folder';
-    $tr['en']['Files'] = 'Files';
-    $tr['en']['Move'] = 'Move';
-    $tr['en']['Change'] = 'Change';
-    $tr['en']['Settings'] = 'Settings';
-    $tr['en']['Language'] = 'Language';
-    $tr['en']['ErrorReporting'] = 'Error Reporting';
-    $tr['en']['ShowHiddenFiles'] = 'Show Hidden Files';
-    $tr['en']['Help'] = 'Help';
-    $tr['en']['Created'] = 'Created';
-    $tr['en']['Help Documents'] = 'Help Documents';
-    $tr['en']['Report Issue'] = 'Report Issue';
-    $tr['en']['Generate'] = 'Generate';
-    $tr['en']['FullSize'] = 'Full Size';
-    $tr['en']['HideColumns'] = 'Hide Perms/Owner columns';
-    $tr['en']['You are logged in'] = 'You are logged in';
-    $tr['en']['Nothing selected'] = 'Nothing selected';
-    $tr['en']['Paths must be not equal'] = 'Paths must be not equal';
-    $tr['en']['Renamed from'] = 'Renamed from';
-    $tr['en']['Archive not unpacked'] = 'Archive not unpacked';
-    $tr['en']['Deleted'] = 'Deleted';
-    $tr['en']['Archive not created'] = 'Archive not created';
-    $tr['en']['Copied from'] = 'Copied from';
-    $tr['en']['Permissions changed'] = 'Permissions changed';
-    $tr['en']['to'] = 'to';
-    $tr['en']['Saved Successfully'] = 'Saved Successfully';
-    $tr['en']['not found!'] = 'not found!';
-    $tr['en']['File Saved Successfully'] = 'File Saved Successfully';
-    $tr['en']['Archive'] = 'Archive';
-    $tr['en']['Permissions not changed'] = 'Permissions not changed';
-    $tr['en']['Select folder'] = 'Select folder';
-    $tr['en']['Source path not defined'] = 'Source path not defined';
-    $tr['en']['already exists'] = 'already exists';
-    $tr['en']['Error while moving from'] = 'Error while moving from';
-    $tr['en']['Create archive?'] = 'Create archive?';
-    $tr['en']['Invalid file or folder name'] = 'Invalid file or folder name';
-    $tr['en']['Archive unpacked'] = 'Archive unpacked';
-    $tr['en']['File extension is not allowed'] = 'File extension is not allowed';
-    $tr['en']['Root path'] = 'Root path';
-    $tr['en']['Error while renaming from'] = 'Error while renaming from';
-    $tr['en']['File not found'] = 'File not found';
-    $tr['en']['Error while deleting items'] = 'Error while deleting items';
-    $tr['en']['Moved from'] = 'Moved from';
-    $tr['en']['Generate new password hash'] = 'Generate new password hash';
-    $tr['en']['Login failed. Invalid username or password'] = 'Login failed. Invalid username or password';
-    $tr['en']['password_hash not supported, Upgrade PHP version'] = 'password_hash not supported, Upgrade PHP version';
-    $tr['en']['Advanced Search'] = 'Advanced Search';
-    $tr['en']['Error while copying from'] = 'Error while copying from';
-    $tr['en']['Invalid characters in file name'] = 'Invalid characters in file name';
-    $tr['en']['FILE EXTENSION HAS NOT SUPPORTED'] = 'FILE EXTENSION HAS NOT SUPPORTED';
-    $tr['en']['Selected files and folder deleted'] = 'Selected files and folder deleted';
-    $tr['en']['Error while fetching archive info'] = 'Error while fetching archive info';
-    $tr['en']['Delete selected files and folders?'] = 'Delete selected files and folders?';
-    $tr['en']['Search file in folder and subfolders...'] = 'Search file in folder and subfolders...';
-    $tr['en']['Access denied. IP restriction applicable'] = 'Access denied. IP restriction applicable';
-    $tr['en']['Invalid characters in file or folder name'] = 'Invalid characters in file or folder name';
-    $tr['en']['Operations with archives are not available'] = 'Operations with archives are not available';
-    $tr['en']['File or folder with this path already exists'] = 'File or folder with this path already exists';
+    $tr['en']['AppName'] = 'Tiny File Manager'; 
 
     $i18n = fm_get_translations($tr);
-    $tr = $i18n ? $i18n : $tr;
+    $tr = $i18n;
 
     if (!strlen($lang)) {
         $lang = 'en';
@@ -4160,6 +4060,5 @@ function lng($txt)
     } else {
         return "$txt";
     }
-
 }
 ?>
