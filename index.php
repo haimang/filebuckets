@@ -616,6 +616,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         $targetPath = $path . $ds;
         if (is_writable($targetPath)) {
             $fullPath = $path . '/' . basename($fullPathInput);
+            echo $fullPath;die;
             $folder = substr($fullPath, 0, strrpos($fullPath, "/"));
 
             if (!is_dir($folder)) {
