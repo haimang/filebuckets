@@ -1394,7 +1394,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         }
 
         // to 目标文件夹
-        $copy_to_path = FM_ROOT_PATH;
+        $copy_to_path = $path;
         $sj_copy_to_path = $html_path;//FM_ROOT_PATH;
         $copy_to = fm_clean_path($_POST['copy_to']);
         if ($copy_to != '') {
@@ -2774,16 +2774,16 @@ function fm_show_footer()
             }
             
             $("#copy-file-form input[name=file]").val(JSON.stringify(checkedValues));
-            $("#file-name").val(content);
-            $("#old-folder").val(p+'/');
-            $("#path-folder").html(g+'/');
+            $("#copy-file-form #file-name").val(content);
+            $("#copy-file-form #old-folder").val(p+'/');
+            $("#copy-file-form #path-folder").html(p+'/');
             $("#modal-copy").modal('show');
         }
 
         function unzip(p,n,g){
-            $("#file-name").val(n);
+            $("#unzip-form #file-name").val(n);
             $("#unzip-form input[name=unzip]").val(n);
-            $("#path-folder").html(p+'/');
+            $("#unzip-form #path-folder").html(p+'/');
             $("#unzip-modal").modal('show');
         }
 
@@ -3359,6 +3359,29 @@ function fm_rcopy($path, $dest, $upd = true, $force = true)
         return fm_copy($path, $dest, $upd);
     }
     return false;
+}
+
+/**
+ * Safely copy file
+ * @param string $f1
+ * @param string $f2
+ * @param bool $upd Indicates if file should be updated with new content
+ * @return bool
+ */
+function fm_copy($f1, $f2, $upd)
+{
+    $time1 = filemtime($f1);
+    if (file_exists($f2)) {
+        $time2 = filemtime($f2);
+        if ($time2 >= $time1 && $upd) {
+            return false;
+        }
+    }
+    $ok = copy($f1, $f2);
+    if ($ok) {
+        touch($f2, $time1);
+    }
+    return $ok;
 }
 
 /**
