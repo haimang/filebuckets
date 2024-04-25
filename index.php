@@ -562,7 +562,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         $fullPathInput = fm_clean_path($_REQUEST['fullpath']);
         $dzuuids=[];
         if($dzuuid!=0){
-            if(!$_SESSION[FM_SESSION_ID]['dzuuids']){
+            if(!isset($_SESSION[FM_SESSION_ID]['dzuuids'])){
                 $_SESSION[FM_SESSION_ID]['dzuuids']=[];
             }else{
                 $dzuuids=$_SESSION[FM_SESSION_ID]['dzuuids'];
@@ -646,7 +646,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                             }
                             $response = array(
                                 'status' => 'success',
-                                'info' => "file upload successful ".$filename,
+                                'info' => "1 file upload successful ".$filename,
                             );
                         } else {
                             $response = array(
@@ -661,7 +661,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
                         $response = array(
                             'status' => 'success',
-                            'info' => "file upload successful ".$filename,
+                            'info' => "2 file upload successful ".$filename,
                         );
                     } else {
                         $response = array(
@@ -675,7 +675,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                             $ext_1 = $ext ? '.' . $ext : '';
                             $d=date('ymdHis');
                             $fullPathTarget = $path . '/' . basename($fullPathInput, $ext_1) . '_' . $d . $ext_1;
-                            $filename=basename($fullPathInput, $ext_1) . '_' . $d . $ext_1;
+                            $filename_l=basename($fullPathInput, $ext_1) . '_' . $d . $ext_1;
                         } else {
                             $fullPathTarget = $fullPath;
                         }
@@ -687,7 +687,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     if (file_exists($fullPath)) {
                         $response = array(
                             'status' => 'success',
-                            'info' => "file upload successful ".$filename,
+                            'info' => "3 file upload successful ".$filename,
                         );
                     } else {
                         $response = array(
@@ -716,7 +716,8 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                     array_push($dzuuids,$dzuuid);
                     $_SESSION[FM_SESSION_ID]['dzuuids']=$dzuuids;
                 }
-                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$filename, 'file',$sj_path,$filesize,$ext);
+                $f_name=isset($filename_l)?$filename_l:$filename;
+                addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$f_name, 'file',$sj_path,$filesize,$ext);
             }
         }
         // Return the response
