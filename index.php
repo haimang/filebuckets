@@ -661,7 +661,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
                         $response = array(
                             'status' => 'success',
-                            'info' => "2 file upload successful ".$fullPath,
+                            'info' => "2 file upload successful ".$fullPathInput,
                         );
                     } else {
                         $response = array(
