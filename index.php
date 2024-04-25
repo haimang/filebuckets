@@ -47,7 +47,7 @@ $exclude_items = array();
 // Google => View documents using Google Docs Viewer
 // Microsoft => View documents using Microsoft Web Apps Viewer
 // false => disable online doc viewer
-$online_viewer = 'Google';
+$online_viewer = 'Microsoft';
 
 // Sticky Nav bar
 // true => enable sticky header
@@ -350,9 +350,9 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
     //用户相关的表单提交
     if(isset($_GET['nav']) && $_GET['nav']=='users'){
-        //添加
+        //添加  修改
         if(isset($_POST['name'],$_POST['password'],$_POST['token']) && !FM_READONLY){
-            if($_POST['name']=='' || $_POST['password']==''){
+            if($_POST['name']=='' && ( $_POST['password']=='' && $_POST['user_hash']=='')){
                 $response = array(
                     'status' => 'alert',
                     'info' =>lng('User account and password must be filled in')
@@ -361,52 +361,99 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                 exit();
             }
 
-            //账号和邮箱已经存在
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE name = ?");
-            $stmt->execute([$_POST['name']]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            if($user){
-                $response = array(
-                    'status' => 'alert',
-                    'info' =>lng('Username').' '.lng('already exists')
-                );
-                echo json_encode($response);
-                exit();
-            }
-
-            if($_POST['email']!=''){
-                $stmt1 = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-                $stmt1->execute([$_POST['email']]);
-                $user_e = $stmt1->fetch(PDO::FETCH_ASSOC);
-                if($user_e){
+            if(isset($_POST['user_hash']) && !empty($_POST['user_hash'])){
+                $user_stmt = $pdo->prepare("SELECT * FROM users WHERE hash = ?");
+                $user_stmt->execute([$_POST['user_hash']]);
+                $userinfo = $user_stmt->fetch(PDO::FETCH_ASSOC);
+                //账号和邮箱已经存在
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE name = ? and hash !=?");
+                $stmt->execute([$_POST['name'],$_POST['user_hash']]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                if($user){
                     $response = array(
                         'status' => 'alert',
-                        'info' =>lng('Email').' '.lng('already exists')
+                        'info' =>lng('Username').' '.lng('already exists')
                     );
                     echo json_encode($response);
                     exit();
                 }
-            }
-            $directory=$_POST['path']!=''?$_POST['path']:$_POST['name'];
 
-            $userinfo=registerUser($pdo,$_POST['name'],$_POST['password'],$directory,$_POST['email'],$_POST['type'],$_POST['delete_perm']);
-            if(isset($userinfo['hash'])){
-                $directory=str_replace( '/', '', fm_clean_path( strip_tags( $directory ) ) );
-                
-                if (!is_dir($directory)){
-                    mkdir($directory, 0777, true);
-                    //添加数据入库
-                    addFile($pdo,$userinfo['hash'],$directory, 'folder');
+                if($_POST['email']!=''){
+                    $stmt1 = $pdo->prepare("SELECT * FROM users WHERE email = ? and hash !=?");
+                    $stmt1->execute([$_POST['email'],$_POST['user_hash']]);
+                    $user_e = $stmt1->fetch(PDO::FETCH_ASSOC);
+                    if($user_e){
+                        $response = array(
+                            'status' => 'alert',
+                            'info' =>lng('Email').' '.lng('already exists')
+                        );
+                        echo json_encode($response);
+                        exit();
+                    }
                 }
+
+                if(!empty($_POST['password'])){
+                    $password_stmt = $pdo->prepare("UPDATE users SET password=?  WHERE hash = ? ");
+                    $hashedPassword = md5($hash.$_POST['password']);
+                    $password_stmt->execute([$hashedPassword, $_POST['user_hash']]);
+                }
+
+                $update_stmt = $pdo->prepare("UPDATE users SET name=?,email=?,type=?,delete_perm=?,update_time=?  WHERE hash = ? ");
+                $update_time=date('Y-m-d H:i:s');
+                $update_stmt->execute([$_POST['name'],$_POST['email'],$_POST['type'],$_POST['delete_perm'],$update_time, $_POST['user_hash']]);
+
                 $response = array(
                     'status' => 'success',
-                    'info' =>lng('CreateNow').' '.lng('Success')
+                    'info' =>lng('Edit').' '.lng('Success')
                 );
             }else{
-                $response = array(
-                    'status' => 'error',
-                    'info' =>lng('CreateNow').' '.lng('Error')
-                );
+                //账号和邮箱已经存在
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE name = ?");
+                $stmt->execute([$_POST['name']]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                if($user){
+                    $response = array(
+                        'status' => 'alert',
+                        'info' =>lng('Username').' '.lng('already exists')
+                    );
+                    echo json_encode($response);
+                    exit();
+                }
+
+                if($_POST['email']!=''){
+                    $stmt1 = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+                    $stmt1->execute([$_POST['email']]);
+                    $user_e = $stmt1->fetch(PDO::FETCH_ASSOC);
+                    if($user_e){
+                        $response = array(
+                            'status' => 'alert',
+                            'info' =>lng('Email').' '.lng('already exists')
+                        );
+                        echo json_encode($response);
+                        exit();
+                    }
+                }
+                $directory=$_POST['path']!=''?$_POST['path']:$_POST['name'];
+
+                $userinfo=registerUser($pdo,$_POST['name'],$_POST['password'],$directory,$_POST['email'],$_POST['type'],$_POST['delete_perm']);
+                if(isset($userinfo['hash'])){
+                    $directory=str_replace( '/', '', fm_clean_path( strip_tags( $directory ) ) );
+                    
+                    if (!is_dir($directory)){
+                        mkdir($directory, 0777, true);
+                        //添加数据入库
+                        addFile($pdo,$userinfo['hash'],$directory, 'folder');
+                    }
+                    $response = array(
+                        'status' => 'success',
+                        'info' =>lng('CreateNow').' '.lng('Success')
+                    );
+                }else{
+                    $response = array(
+                        'status' => 'error',
+                        'info' =>lng('CreateNow').' '.lng('Error')
+                    );
+                }
             }
 
             echo json_encode($response);
@@ -438,6 +485,27 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                 $response = array(
                     'status' => 'alert',
                     'info' =>lng('CreateNow').' '.lng('Error')
+                );
+            }
+            echo json_encode($response);
+            exit();
+        }
+
+        //详情
+        if(isset($_GET['detail']) && !FM_READONLY){
+            $hash=$_GET['detail'];
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE hash = ?");
+            $stmt->execute([$hash]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            if(!empty($user) && !is_null($user)){
+                $response = array(
+                    'status' => 'success',
+                    'info' =>$user
+                );
+            }else{
+                $response = array(
+                    'status' => 'error',
+                    'info' =>lng('not found!')
                 );
             }
             echo json_encode($response);
@@ -527,6 +595,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
         $filename = $f['file']['name'];
         $tmp_name = $f['file']['tmp_name'];
+
         $ext = pathinfo($filename, PATHINFO_FILENAME) != '' ? strtolower(pathinfo($filename, PATHINFO_EXTENSION)) : '';
 
         $filesize = isset($_POST['dztotalfilesize'])?$_POST['dztotalfilesize']:fm_get_size($tmp_name);
@@ -1039,6 +1108,137 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         exit();
     }
 
+    // Unpack zip, tar
+    if (isset($_POST['unzip'], $_POST['token']) && !FM_READONLY) {
+        if(!verifyToken($_POST['token'])) {
+            $response = array(
+                'status' => 'error',
+                'info' =>lng("Invalid Token.")
+            );
+            echo json_encode($response);
+            exit();
+        }
+
+        $unzip = urldecode($_POST['unzip']);
+        $unzip = fm_clean_path($unzip);
+        $unzip = str_replace('/', '', $unzip);
+
+        $isValid = false;
+
+        $path = FM_ROOT_PATH;
+        $sj_path = $html_path;//FM_ROOT_PATH;
+        if (FM_PATH != '') {
+            $path .= '/' . FM_PATH;
+            if(!empty($sj_path)){
+                $sj_path.='/' ;
+            }
+            $sj_path.= FM_PATH;
+        }
+
+        if ($unzip != '' && is_file($path . '/' . $unzip)) {
+            $zip_path = $path . '/' . $unzip;
+            $ext = pathinfo($zip_path, PATHINFO_EXTENSION);
+            $isValid = true;
+        } else {
+            $response = array(
+                'status' => 'error',
+                'info' =>lng('File not found')
+            );
+            echo json_encode($response);
+            exit();
+        }
+
+        if (($ext == "zip" && !class_exists('ZipArchive')) || ($ext == "tar" && !class_exists('PharData'))) {
+            $response = array(
+                'status' => 'error',
+                'info' =>lng('Operations with archives are not available')
+            );
+            echo json_encode($response);
+            exit();
+        }
+
+        if ($isValid) {
+            //to folder
+            if (isset($_POST['tofolder']) && $_POST['tofolder']!='') {
+                if (fm_mkdir($path . '/' . $_POST['tofolder'], true)) {
+                    $path .= '/' . $_POST['tofolder'];
+                    $sj_path.='/' . $_POST['tofolder'];
+
+                    $tofolder_arr=explode('/',$_POST['tofolder']);
+                    //目录数据添加
+                    $folder_folder_path=$sj_path;
+                    foreach($tofolder_arr as $tofolder_info){
+                        addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$tofolder_info,'folder',$folder_folder_path,'','');
+                        $folder_folder_path.='/'.$tofolder_info;
+                    }
+                }
+            }
+            
+            if($ext == "zip") {
+                $zipper = new FM_Zipper();
+                $res = $zipper->unzip($zip_path, $path);
+            } elseif ($ext == "tar") {
+                try {
+                    $gzipper = new PharData($zip_path);
+                    if (@$gzipper->extractTo($path,null, true)) {
+                        $res = true;
+                    } else {
+                        $res = false;
+                    }
+                } catch (Exception $e) {
+                    //TODO:: need to handle the error
+                    $res = true;
+                }
+            }
+
+            if ($res) {
+                $list=fm_get_zif_info($zip_path,$ext);
+                if(!empty($list)){
+                    //文件数据入库
+                    foreach($list as $item){
+                        $name_arr=explode('/',$item['name']);
+                        $name=end($name_arr);
+                        $type='file';
+                        if($item['folder']==1){
+                            $name=prev($name_arr);
+                            $type='folder';
+                        }else{
+                            foreach($name_arr as $n_item){
+                                if(!empty($n_item) && $n_item!=$name){
+                                    $sj_path.='/'.$n_item;
+                                }
+                            }
+                        }
+                        $zip_file_info=getFile_u($pdo,$name,$sj_path);
+                        if(empty($zip_file_info) || is_null($zip_file_info)){
+                            //不存在 添加数据
+                            $fileinfo_ext_arr=explode('.',$name);
+                            $fileinfo_ext=end($fileinfo_ext_arr);
+                            addFile($pdo,$_SESSION[FM_SESSION_ID]['hash'],$name,$type,$sj_path,$item['filesize'],$fileinfo_ext);
+                        }
+                    }
+                }
+                
+                $response = array(
+                    'status' => 'success',
+                    'info' =>lng('Archive unpacked')
+                );
+            } else {
+                $response = array(
+                    'status' => 'error',
+                    'info' =>lng('Archive not unpacked')
+                );
+            }
+        } else {
+            $response = array(
+                'status' => 'error',
+                'info' =>lng('File not found')
+            );
+        }
+        echo json_encode($response);
+        exit();
+    }
+
     //获取文件详情
     if(isset($_GET['detail'])){
         $file = $_GET['detail'];
@@ -1378,6 +1578,10 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
                                     <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
                                 </a>
                                 <?php } ?>
+
+                                <a  onclick="edit('edit','<?php echo lng('Edit').' '.lng('Users'); ?>', '<?php echo $row['hash'] ?>');return false;" class="btn btn-twitter btn-icon btn-icon1" aria-label="edit">
+                                    <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-edit"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1"></path><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z"></path><path d="M16 5l3 3"></path></svg>
+                                </a>
                             </div>
                         </td>
                       </tr>
@@ -1715,7 +1919,15 @@ flush();
                                                     <a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '<?php echo fm_enc(addslashes($f)) ?>','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>');return false;"  class="btn btn-lime btn-icon btn-icon1" aria-label="copy">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg>
                                                     </a>
-                                                <?php } ?>
+                                                <?php } 
+                                                    if(in_array($ext,['zip','tar'])){
+                                                ?>
+
+                                                <a onclick="unzip('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '<?php echo fm_enc(addslashes($f)) ?>','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>');return false;" target="_blank" class="btn btn-azure btn-icon btn-icon1" aria-label="unzip" title="<?php echo lng('unzip');?>">
+                                                        <svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg>
+                                                    </a>
+                                                    <?php } ?>
+
                                                     <a href="<?php echo fm_enc(FM_ROOT_URL . (!empty($html_path)?'/'.$html_path:'' ).(FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank" class="btn btn-teal btn-icon btn-icon1" aria-label="link">
                                                         <svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-link"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 15l6 -6"></path><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"></path><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"></path></svg>
                                                     </a>
@@ -1759,21 +1971,21 @@ flush();
                             <input type="hidden" name="col-other" id="col-other" value="<?php echo fm_get_filesize($files_size['other']);?>">
                             </div>
                             <div class="col-12">
-                                <div class="col-xs-12 col-9">
-                                    <ul class="list-inline footer-action" style="margin-top: 1rem;">
-                                        <li class="list-inline-item"> <a href="#/select-all" class="btn btn-small btn-outline-primary btn-2" onclick="select_all();return false;"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-square-check"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path><path d="M9 12l2 2l4 -4"></path></svg> <?php echo lng('SelectAll') ?> </a></li>
+                                <div class="col-xs-12">
+                                    <ul class="list-inline footer-action" >
+                                        <li class="list-inline-item py-1"> <a href="#/select-all" class="btn btn-small btn-outline-primary btn-2" onclick="select_all();return false;"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-square-check"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M3 3m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path><path d="M9 12l2 2l4 -4"></path></svg> <?php echo lng('SelectAll') ?> </a></li>
 
-                                        <li class="list-inline-item"><a href="#/unselect-all" class="btn btn-small btn-outline-primary btn-2" onclick="unselect_all();return false;"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-square-x"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z"></path><path d="M9 9l6 6m0 -6l-6 6"></path></svg> <?php echo lng('UnSelectAll') ?> </a></li>
+                                        <li class="list-inline-item py-1"><a href="#/unselect-all" class="btn btn-small btn-outline-primary btn-2" onclick="unselect_all();return false;"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-square-x"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z"></path><path d="M9 9l6 6m0 -6l-6 6"></path></svg> <?php echo lng('UnSelectAll') ?> </a></li>
 
-                                        <li class="list-inline-item"><a href="#/invert-all" class="btn btn-small btn-outline-primary btn-2" onclick="invert_all();return false;"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-list"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 6l11 0"></path><path d="M9 12l11 0"></path><path d="M9 18l11 0"></path><path d="M5 6l0 .01"></path><path d="M5 12l0 .01"></path><path d="M5 18l0 .01"></path></svg> <?php echo lng('InvertSelection') ?> </a></li>
+                                        <li class="list-inline-item py-1"><a href="#/invert-all" class="btn btn-small btn-outline-primary btn-2" onclick="invert_all();return false;"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-list"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 6l11 0"></path><path d="M9 12l11 0"></path><path d="M9 18l11 0"></path><path d="M5 6l0 .01"></path><path d="M5 12l0 .01"></path><path d="M5 18l0 .01"></path></svg> <?php echo lng('InvertSelection') ?> </a></li>
 
-                                        <li class="list-inline-item"><a onclick="pack('<?php echo lng('Delete selected files and folders?'); ?>', 'delete');return false;"class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg> <?php echo lng('Delete') ?> </a></li>
+                                        <li class="list-inline-item py-1"><a onclick="pack('<?php echo lng('Delete selected files and folders?'); ?>', 'delete');return false;"class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg> <?php echo lng('Delete') ?> </a></li>
                                             
-                                        <li class="list-inline-item"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'zip');return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Zip') ?> </a></li>
+                                        <li class="list-inline-item py-1"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'zip');return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Zip') ?> </a></li>
 
                                         <!-- <li class="list-inline-item"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'tar');return false;"  class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Tar') ?> </a></li> -->
 
-                                        <li class="list-inline-item"><a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>',1);return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg> <?php echo lng('Copy') ?> </a></li>
+                                        <li class="list-inline-item py-1"><a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>',1);return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg> <?php echo lng('Copy') ?> </a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1854,20 +2066,28 @@ function fm_show_nav_path($path,$nav)
                     <?php 
                     if($nav=='home'){
                         ?>
-                  <span class="d-none d-sm-inline">
-                    <a class="btn" data-bs-toggle="modal" data-bs-target="#modal-upload">
+                 
+                    <a class="btn d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-upload" aria-label="<?php echo lng('UploadingFiles'); ?>">
                         <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 20h-8a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12v5" /><path d="M11 16h-5a2 2 0 0 0 -2 2" /><path d="M15 16l3 -3l3 3" /><path d="M18 13v9" /></svg>
                         <?php echo lng('UploadingFiles'); ?>
                     </a>
-                  </span>
-                  <a  class="btn" data-bs-toggle="modal" data-bs-target="#modal-folder">
+                    <a class="btn d-sm-none btn-icon" data-bs-toggle="modal" data-bs-target="#modal-upload">
+                        <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 20h-8a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12v5" /><path d="M11 16h-5a2 2 0 0 0 -2 2" /><path d="M15 16l3 -3l3 3" /><path d="M18 13v9" /></svg>
+                    </a>
+                  <a  class="btn d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-folder">
                     <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
                     <?php echo lng('NewItem'); ?>
                   </a>
+                  <a  class="btn  d-sm-none btn-icon" data-bs-toggle="modal" data-bs-target="#modal-folder" aria-label="<?php echo lng('NewItem'); ?>">
+                    <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                  </a>
                   <?php }elseif($nav=='users'){ if($_SESSION[FM_SESSION_ID]['user']['type']=='admin'){ ?>
-                    <a  class="btn" data-bs-toggle="modal" data-bs-target="#modal-users">
+                    <a  class="btn d-none d-sm-inline-block" onclick="edit('add','<?php echo lng('Create User'); ?>', '');return false;">
                     <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
                     <?php echo lng('Create User'); ?>
+
+                    <a  class="btn d-sm-none btn-icon" onclick="edit('add','<?php echo lng('Create User'); ?>', '');return false;" aria-label="<?php echo lng('Create User'); ?>">
+                    <svg xmlns="<?php print_external('icon-2000');?>" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
                   </a>
                  <?php } } ?>
                 </div>
@@ -1929,6 +2149,7 @@ function fm_show_header($nav,$path)
         body {
       	    font-feature-settings: "cv03", "cv04", "cv11";
         }
+        .nav-item{min-width: 92px;}
         .btn-icon1 {
             min-width:calc(var(--tblr-btn-line-height) * var(--tblr-btn-font-size) + var(--tblr-btn-padding-y) * 1.2 + var(--tblr-btn-border-width) * 1.2);
             min-height:calc(var(--tblr-btn-line-height) * var(--tblr-btn-font-size) + var(--tblr-btn-padding-y) * 1.2 + var(--tblr-btn-border-width) * 1.2);
@@ -2081,7 +2302,7 @@ function fm_show_header($nav,$path)
                         </div>
                         <label class="form-label"></label>
                         <div class="form-selectgroup-boxes row">
-                            <div class="col-lg-3">
+                            <div class="col-lg-3 mb-3">
                                 <label class="form-selectgroup-item">
                                 <input type="radio" name="type" value="zip" class="form-selectgroup-input" checked>
                                 <span class="form-selectgroup-label d-flex align-items-center p-3">
@@ -2094,7 +2315,7 @@ function fm_show_header($nav,$path)
                                 </span>
                                 </label>
                             </div>
-                            <div class="col-lg-3">
+                            <div class="col-lg-3  mb-3">
                                 <label class="form-selectgroup-item">
                                 <input type="radio" name="type" value="tar" class="form-selectgroup-input">
                                 <span class="form-selectgroup-label d-flex align-items-center p-3">
@@ -2117,6 +2338,39 @@ function fm_show_header($nav,$path)
                 <div class="modal-footer">
                     <input type="hidden" name="group" value="1">
                     <input type="hidden" name="file" value="">
+                    <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><?php echo lng('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary" data-bs-dismiss="modal"><?php echo lng('Execute') ?> </button>
+                </div>
+            </form>
+            </div>
+        </div>
+    </div>
+
+    <!--解压缩 提醒-->
+    <div class="modal modal-blur fade" id="unzip-modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" >
+            <div class="modal-content">
+                <div class="modal-header other-div">
+                    <h5 class="modal-title pack-content" ><?php echo lng('unzip') ?></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="unzip-form" method="post" novalidate>
+                    <div class="modal-body other-div">
+                        <div class="mb-3">
+                            <label class="form-label"><?php echo lng('Files') ?>：</label>
+                            <input type="text" id="file-name" class="form-control" disabled>
+                            <input type="hidden" name="unzip" value="">
+                        </div>
+                        <div class="mb-3">
+                        <label class="form-label"><?php echo lng('UnZipToFolder') ?>：</label>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text" id="path-folder">/</span>
+                            <input type="text" name="tofolder" id="tofolder" class="form-control" placeholder="mind/nested/folder">
+                        </div>
+                    </div>
+                    </div>
+                <div class="modal-footer">
                     <input type="hidden" name="token" value="<?php echo $_SESSION['token']; ?>">
                     <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><?php echo lng('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary" data-bs-dismiss="modal"><?php echo lng('Execute') ?> </button>
@@ -2154,7 +2408,7 @@ function fm_show_header($nav,$path)
                 </div>
                 <label class="form-label"></label>
                 <div class="form-selectgroup-boxes row">
-                    <div class="col-lg-3">
+                    <div class="col-lg-3  mb-3">
                         <label class="form-selectgroup-item">
                         <input type="radio" name="copy_type" value="1" class="form-selectgroup-input" checked>
                         <span class="form-selectgroup-label d-flex align-items-center p-3">
@@ -2167,7 +2421,7 @@ function fm_show_header($nav,$path)
                         </span>
                         </label>
                     </div>
-                    <div class="col-lg-3">
+                    <div class="col-lg-3  mb-3">
                         <label class="form-selectgroup-item">
                         <input type="radio" name="copy_type" value="2" class="form-selectgroup-input">
                         <span class="form-selectgroup-label d-flex align-items-center p-3">
@@ -2525,6 +2779,13 @@ function fm_show_footer()
             $("#modal-copy").modal('show');
         }
 
+        function unzip(p,n,g){
+            $("#file-name").val(n);
+            $("#unzip-form input[name=unzip]").val(n);
+            $("#path-folder").html(p+'/');
+            $("#unzip-modal").modal('show');
+        }
+
         function pack(c, t) {
             var checkedValues = [];
             $('input[type=checkbox]:checked').each(function(){
@@ -2688,6 +2949,36 @@ function fm_show_footer()
             modal.find('.modal-content #confirmDailog-user-form').attr('action',a.data('url'));
             modal.find('.modal-body .modal-content-t').html(a.data('title')+' '+a.data('name'));
         });
+
+        function edit(type,title,hash){
+            var url=window.location+'&detail='+hash;
+            $("#create-user-form").get(0).reset();
+            $("#modal-users  .modal-title").html(title);
+            if(type=='edit'){
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    data: '',
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                    success: function(mes){
+                        mes=JSON.parse(mes);
+                        $("#create-user-form input[name=user_hash]").val(hash);
+                        $("#create-user-form input[name=name]").val(mes.info.name);
+                        $("#create-user-form input[name=email]").val(mes.info.email);
+                        $("#create-user-form input[name=path]").val(mes.info.path).attr('readOnly',true);
+                        $("#create-user-form select[name=type]").val(mes.info.type);
+                        $("#create-user-form select[name=delete_perm]").val(mes.info.delete_perm);
+                        $("#modal-users").modal('show');
+                    },
+                    failure: function(mes) {toast('error',"Error: try again");},
+                    error: function(mes) {toast('error',mes.responseText);}
+                });
+            }else{
+                $("#modal-users").modal('show');
+            }
+        }
 
         //文件上传加载
         Dropzone.options.fileUploader = {
@@ -2873,7 +3164,24 @@ function fm_show_footer()
                     error: function(mes) {toast('error',mes.responseText);}
                 });
             });
+            //解压缩 提交
+            $("#unzip-form").on('submit',function(e){
+                e.preventDefault();
+                var form = new FormData($(this)[0]);
+                $.ajax({
+                    type: "POST",
+                    url: window.location,
+                    data: form,
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                    success: function(mes){mes=JSON.parse(mes); toast(mes.status,mes.info); if(mes.status=='success'){window.location.reload();}},
+                    failure: function(mes) {toast('error',"Error: try again");},
+                    error: function(mes) {toast('error',mes.responseText);}
+                });
+            });
         });
+
     </script>
   </body>
 </html>
