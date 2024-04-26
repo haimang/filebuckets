@@ -1060,11 +1060,11 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
             if(isset($_POST['packname']) && !empty($_POST['packname'])){
                 //手动填写的打包文件名
-                $zipname=basename($_POST['packname']). '.'.$ext;
+                $zipname=$_POST['packname']. '.'.$ext;
                 $fullfile=$path.'/'.$zipname;
                 if(file_exists($fullfile)){
                     $d=date('ymdHis');
-                    $zipname=basename($_POST['packname']).'='.$d. '.'.$ext;
+                    $zipname=$_POST['packname'].'='.$d. '.'.$ext;
                 }
             }else{
                 if (count($files) == 1) {
