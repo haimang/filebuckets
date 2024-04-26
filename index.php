@@ -1398,7 +1398,7 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         }
 
         // to 目标文件夹
-        $copy_to_path = $path;
+        $copy_to_path = FM_ROOT_PATH;
         $sj_copy_to_path = $html_path;//FM_ROOT_PATH;
         $copy_to = fm_clean_path($_POST['copy_to']);
         if ($copy_to != '') {
