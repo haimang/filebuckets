@@ -172,9 +172,9 @@ $external = array(
     'js-dropzone' => '<script src="data/dist/js/dropzone-min.js"></script>',
     'js-bootstrap'=>'<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>',
     'js-jquery' => '<script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>',
-    'js-jquery-datatables' => '<script src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js" crossorigin="anonymous" defer></script>',
-    'js-bootstrap-datatables'=>'<script type="text/javascript" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap4.min.js"></script>',
-    'icon-2000' => 'http://www.w3.org/2000/svg',
+    'css-pdf'=>'<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.1.392/pdf_viewer.min.css" integrity="sha512-5Dfh/zHYpSlz7zkw78tRIcEq7bqhdBQMWtEDLuArHaSB0S6S+9XCt703E3L6DtVqvP+KLyL3u+cEEp5efUmXSQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />',
+    'js-pdf'=>'<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.1.392/pdf.min.mjs"></script>',
+    'icon-2000' => 'http://www.w3.org/2000/svg'
 );
 
 // logout
@@ -1311,10 +1311,14 @@ if ($use_auth || isset($_SESSION[FM_SESSION_ID]['logged'])) {
         if($is_onlineViewer) {
             //现在本地文件线上不能访问 测试https://console.unifyestate.com/apartment-v2.7.xlsx
             //$file_url='https://filebuckets.com/Proposal%20-%20VIC%20-%2017%20Wordsworth%20Ave.pdf';
-            if($online_viewer == 'google') {
-                $html.= '<iframe src="https://docs.google.com/viewer?embedded=true&hl=en&url=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
-            } else if($online_viewer == 'microsoft') {
-                $html.= '<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
+            if($ext=='pdf'){
+                $html.='<iframe src="'.fm_enc($file_url).'" frameborder="no" style="width:100%;min-height:460px"></iframe>';
+            }else{
+                if($online_viewer == 'google') {
+                    $html.= '<iframe src="https://docs.google.com/viewer?embedded=true&hl=en&url=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
+                } else if($online_viewer == 'microsoft') {
+                    $html.= '<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
+                }
             }
         }elseif (($is_zip || $is_gzip) && $filenames !== false) {
             $html.= '<code class="maxheight">';
@@ -1950,17 +1954,18 @@ flush();
                                 <tfoot>
                                     <tr><?php if (!FM_READONLY): ?>
                                             <td></td><?php endif; ?>
-                                        <td colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? '6' : '6' ?>"><em><?php echo lng('Folder is empty') ?></em></td>
+                                        <td colspan="<?php echo (!FM_IS_WIN && !$hide_Cols) ? '7' : '7' ?>"><em><?php echo lng('Folder is empty') ?></em></td>
                                     </tr>
                                 </tfoot>
                                 <?php
                             } else { ?>
                                 <tfoot>
                                     <tr>
-                                        <td class="gray border-0" colspan="6">
-                                            <?php echo lng('FullSize').': <span class="badge text-bg-light border-radius-0">'.fm_get_filesize($all_files_size).'</span>' ?>
-                                            <?php echo lng('File').': <span class="badge text-bg-light border-radius-0">'.$num_files.'</span>' ?>
-                                            <?php echo lng('Folder').': <span class="badge text-bg-light border-radius-0">'.$num_folders.'</span>' ?>
+                                        <td class="gray border-0" colspan="7">
+                                            <?php echo lng('FullSize').': <span class="badge text-bg-light" style="border-bottom:2px solid red;">'.fm_get_filesize($all_files_size).'</span>' ?>
+                                            <?php echo lng('File').': <span class="badge text-bg-light" style="border-bottom:2px solid #f8b600;">'.$num_files.'</span>' ?>
+                                            <?php echo lng('Folder').': <span class="badge text-bg-light" style="border-bottom:2px solid #00bd60;">'.$num_folders.'</span>' ?>
+                                            <?php echo lng('PartitionSize').': <span class="badge text-bg-light" style="border-bottom:2px solid #4581ff;">'.fm_get_filesize(@disk_free_space($path)) .'</span> '.lng('FreeOf').': <span class="badge text-bg-light" style="border-bottom:2px solid #ac68fc;">'.fm_get_filesize(@disk_total_space($path)).'</span>'; ?>
                                         </td>
                                     </tr>
                                 </tfoot>
@@ -1983,8 +1988,6 @@ flush();
                                         <li class="list-inline-item py-1"><a onclick="pack('<?php echo lng('Delete selected files and folders?'); ?>', 'delete');return false;"class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-trash"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg> <?php echo lng('Delete') ?> </a></li>
                                             
                                         <li class="list-inline-item py-1"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'zip');return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Zip') ?> </a></li>
-
-                                        <!-- <li class="list-inline-item"><a onclick="pack('<?php echo lng('Create archive?'); ?>', 'tar');return false;"  class="btn btn-small btn-outline-primary btn-2"><svg xmlns="'.$icon_url.'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-zip"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"></path><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2z"></path><path d="M11 5l-1 0"></path><path d="M13 7l-1 0"></path><path d="M11 9l-1 0"></path><path d="M13 11l-1 0"></path><path d="M11 13l-1 0"></path><path d="M13 15l-1 0"></path></svg> <?php echo lng('Tar') ?> </a></li> -->
 
                                         <li class="list-inline-item py-1"><a onclick="copy('<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH.(FM_PATH != '' ? '/' . FM_PATH : ''))) ?>', '','<?php echo fm_enc(fm_convert_win(FM_ROOT_PATH)) ?>',1);return false;" class="btn btn-small btn-outline-primary btn-2"><svg xmlns="<?php print_external('icon-2000');?>" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path></svg> <?php echo lng('Copy') ?> </a></li>
                                     </ul>
@@ -2140,6 +2143,7 @@ function fm_show_header($nav,$path)
     <?php print_external('css-style');?>
     <?php print_external('css-toastr');?>
     <?php print_external('css-datatables');?>
+    <?php print_external('css-pdf');?>
     
     <script type="text/javascript">window.csrf = '<?php echo $_SESSION['token']; ?>';</script>
     <style>
@@ -2742,6 +2746,7 @@ function fm_show_footer()
     <?php print_external('js-jquery');?>
     <?php print_external('js-toastr');?>
     <?php print_external('js-bootstrap');?>
+    <?php print_external('js-pdf');?>
     <script>
         var is_first="<?php echo isset($_SESSION[FM_SESSION_ID]['is_first'])?$_SESSION[FM_SESSION_ID]['is_first']:0;?>";
         function toast(type,txt) {console.log(type); if(type=='success'){toastr.success(txt);} else if(type=='error'){toastr.error(txt);}else if(type=='alert'){toastr.warning(txt);}else{toastr.info(txt);} }
