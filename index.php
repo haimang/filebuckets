@@ -2778,7 +2778,7 @@ function fm_show_footer()
             $("#copy-file-form input[name=file]").val(JSON.stringify(checkedValues));
             $("#copy-file-form #file-name").val(content);
             $("#copy-file-form #old-folder").val(p+'/');
-            $("#copy-file-form #path-folder").html(p+'/');
+            $("#copy-file-form #path-folder").html(g+'/');
             $("#modal-copy").modal('show');
         }
 
