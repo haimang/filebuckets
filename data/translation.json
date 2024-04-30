@@ -187,7 +187,8 @@
         "deletion":"deletion",
         "Confirm deleting all uploaded files related to the user":"Confirm deleting all uploaded files related to the user",
         "Uploading":"Uploading",
-        "Calculating File Sizes":"文件大小计算中"
+        "Calculating File Sizes":"Calculating File Sizes",
+        "Invalid authorization value in HTTP header/URL parameter":"Invalid authorization value in HTTP header/URL parameter"
       }
     },
     {
@@ -375,7 +376,8 @@
         "deletion":"硬删除",
         "Confirm deleting all uploaded files related to the user":"确认删除用户相关上传所有文件",
         "Uploading":"上传中",
-        "Calculating File Sizes":"文件大小计算中"
+        "Calculating File Sizes":"文件大小计算中",
+        "Invalid authorization value in HTTP header/URL parameter":"HTTP标头/URL参数中的授权值无效"
       }
     }
   ]
