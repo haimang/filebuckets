@@ -1,0 +1,18 @@
+File ID Prefix // id 对应的文件类型
+
+pid = path id
+fid = file id
+mid = mutation id
+
+uid = user id
+tid = team id
+
+----------------------------------------
+
+Allowed Sence // 场景值
+
+pwa = progressive web app
+h5 = mobile web
+woa = wechat open appliation //微信开放平台应用
+app = iOS or Android native app
+mini = wechat mini program //微信小程序

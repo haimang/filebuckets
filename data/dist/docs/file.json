@@ -1,0 +1,70 @@
+Endpoint: /api/file
+Des:
+
+Request body - File
+{
+    "method": "detail",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "thumbnail":true, //是否包含BASE64缩略图
+    "mutation": true, //是否包含文件变异体
+    "version": false //是否包含文件的历史文件存档
+}
+
+Response
+{   
+    "code": 200,
+    "fid": "3kmLmQFnf1",
+    "name": "123.xlsx",
+    "ext":"xlsx",
+    "size": 123,
+    "path_from_root": "/home/sean/ting/123.xlsx",
+    "public": 1, // 1 = 完全公开，CORS = *，2 = 登陆后可以得到下载连接, CORS = 设置值，3 = 仅内部使用，接口不给下载链接，CORS
+    "ownership": ["tid":"OEAAAAAAAAAYa", "name":"echo", "logo":""], //owner team info
+    "download": "https://filebuckets.com/sean/ting/123.xlsx",
+    "thumbnail": "BASE64",
+    "mutation": { 
+        // 文件的变异体。仅提供变异体。变异体的id
+        [
+            "mid": "3kmLmQFnf1-2",
+            "method": "ffmpeg",
+            "ext": "gif",
+            "url": "https://filebuckets.com/ting/mutation/HASHID-blackburn.gif",
+            "size": 5463
+        ],
+        [
+            "mid": "3kmLmQFnf1-2",
+            "type": "whisper",
+            "ext": "json",
+            "url": "https://filebuckets.com/ting/mutation/HASHID-blackburn.json",
+            "size": 1463
+        ]
+    },
+    "parent_folder": {"pid": "AAAAAAw", "name": "ting", "path_from_root":"/home/sean/ting"},
+    "tags": ["product", "news"],
+    "version": [],
+    "CORS": "file.buckets.com",
+    "updated_ts": 1714900472,
+    "created_ts": 1714900472
+}
+
+
+
+Request body - File
+{
+    "method": "simple",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+}
+
+Request body - Simple
+{   
+    "code": 200,
+    "fid": "3kmLmQFnf1",
+    "name": "123.xlsx",
+    "ext":"xlsx",
+    "size": 123,
+    "ownership": ["name":"echo"], //owner team info
+    "parent_folder": {"name": "ting"},
+    "updated_ts": 1714900472
+}

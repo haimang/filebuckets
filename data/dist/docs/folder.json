@@ -1,0 +1,71 @@
+Endpoint: /api/folder
+Des:
+
+Request body - Simple
+{
+    "method": "simple", //requesting content, simple or detail, simple does not require authentication, while detail needs token
+    "sence": "pwa", //requesting entrance
+    "pid": "a4ayc_80_OEAAAAAAAAAYa", // requested folder id
+    "level": 1, //how many levels down to sub folders
+    "page_size": 3,
+}
+
+Response
+{   
+    "code": 200,
+    "pid": "OEAAAAAAAAAYa",
+    "name": "ting",
+    "sub_folders": 1,
+    "sub_files": 2,
+    "folder": [
+        {"name": "echo-liu", "pid":"4444AAAAAYa", "thumbnail":""},
+    ],
+    "file": [
+        {"name": "活动.png", "fid":"AAAAAYa", "thumbnail":""},
+        {"name": "123.xlsx", "fid":"OEAAAAA", "thumbnail":""},
+    ],
+    "sort": "folder-first",
+    "CORS": "",
+    "objects": 25,
+    "page_total": 9,
+    "page_size": 3,
+    "page": 1,
+}
+
+
+Request body - Detail
+{
+    "method": "detail", //requesting content, simple or detail, simple does not require authentication, while detail needs token
+    "sence": "pwa", //requesting entrance
+    "level": 1, //how many levels down to sub folders
+    "pid": "a4ayc_80_OEAAAAAAAAAYa" // requested folder id
+}
+
+Response
+{   
+    "code": 200,
+    "pid": "OEAAAAAAAAAYa",
+    "name": "ting",
+    "path_from_root": "/home/sean/ting",
+    "sub_folders": 1,
+    "sub_files": 2,
+    "permission": 600,
+    "ownership": ["tid":"OEAAAAAAAAAYa", "name":"echo", "logo":""], //owner team info
+    "folder": [
+        {"name": "echo-liu", "pid":"4444AAAAAYa" , "thumbnail":""},
+    ],
+    "file": [
+        {"name": "活动.png", "fid":"AAAAAYa", "status":["soft_delete": false, "public": true], "thumbnail":"", "download":"", "size": 2312, "ext":"png", "updated_ts":""},
+        {"name": "123.xlsx", "fid":"OEAAAAA", "status":["soft_delete": true, "public": false], "thumbnail":"", "size": 12, "ext":"xlsx", "updated_ts":""},
+    ],
+    "parent": {"fid": "AAAAAAw", "name": "ting", "path_from_root":"/home/sean"},
+    "file_types":{"image": ["count": ,"sizes":], "video": ["count": ,"sizes":], "docs": ["count": ,"sizes":], "other": ["count": ,"sizes":]},
+    "sort": "folder-first",
+    "CORS": "",
+    "objects": 25,
+    "page_total": 9,
+    "page_size": 3,
+    "page": 1,
+    "updated_ts": 1714900472,
+    "created_ts": 1714900472,
+}

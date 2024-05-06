@@ -1,0 +1,50 @@
+Endpoint: /api/operations
+Des:
+
+Request body
+{
+    "operation": "delete",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "method": "soft", 
+}
+
+{
+    "operation": "rename",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "original_name": "soft.txt", 
+    "new_name": "soft.xlsx", 
+}
+
+{
+    "operation": "copyto",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "original_folder_path": "", 
+    "copy_to_folder_path": "", 
+}
+
+{
+    "operation": "moveto",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "original_folder_path": "", 
+    "move_to_folder_path": "", 
+}
+
+{
+    "operation": "mutation",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "method": "ffmpeg", 
+    "config":""
+}
+
+{
+    "operation": "archive",
+    "sence": "pwa",
+    "fid": "3kmLmQFnf1Aw",
+    "method": "zip", 
+    "zip_to_folder_path": "",
+}
